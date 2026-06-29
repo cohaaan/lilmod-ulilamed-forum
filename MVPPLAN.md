@@ -4,6 +4,8 @@
 
 The full feature inventory lives in [`PLAN.md`](PLAN.md). This document defines what actually ships in the MVP.
 
+Push notification implementation detail lives in [`NOTIFICATIONS.md`](NOTIFICATIONS.md) (FCM transport, Celery, device tokens, badges, deep links).
+
 ---
 
 ## What the MVP must prove
@@ -186,11 +188,11 @@ Three notification types only:
 - Tap → deep link to thread/post
 
 *Push + app-icon badge (when the app is closed):*
-- **Firebase Cloud Messaging (FCM)** delivers a push on reply/quote/mention → OS shows a notification **and** paints the red number on the app icon (springboard badge)
-- Flutter registers a device token (`firebase_messaging` + `flutter_local_notifications`) and POSTs it to the backend
-- Backend stores tokens (`DeviceToken`) and sends FCM messages with a `badge` count = recipient's unread total
+- **Firebase Cloud Messaging (FCM)** delivers a push on reply/quote/mention → OS shows a notification and updates the app-icon badge where supported
+- Flutter registers a device token (`firebase_messaging`) and POSTs it to the backend (see [`NOTIFICATIONS.md`](NOTIFICATIONS.md))
+- Backend stores tokens (`DeviceToken`), sends FCM via **Celery + Redis** after the DB transaction commits, with unread count in the payload
 - Tapping the push opens the app and deep-links to the post
-- **iOS caveat:** app-icon badge requires Apple Developer Program + APNs/push capability; Android works through FCM with no paid account — build/test Android first
+- **Badge:** exact red numeric badge on **iOS** (`aps.badge`); on **Android**, notification dot or numeric badge depends on launcher/OEM — build/test Android first; iOS needs Apple Developer + APNs
 
 No email preferences, batched upvotes, forum-follow alerts, or system announcements in MVP.
 
@@ -334,8 +336,10 @@ Bookmark            user FK, thread FK, unique per user/thread
 Notification        recipient FK, actor FK, type (reply/quote/mention),
                     thread FK, post FK, is_read, created_at
 
-DeviceToken         user FK, token, platform (ios/android), created_at,
-                    last_seen_at, is_active   # for FCM push + app-icon badge
+DeviceToken         user FK, token (unique), platform, is_active,
+                    permission_status, failure_count,
+                    last_registered_at, last_successful_push_at
+                    # full schema: NOTIFICATIONS.md
 
 Report              reporter FK, target_type, target_id, reason,
                     details, status, created_at
@@ -364,8 +368,8 @@ Report              reporter FK, target_type, target_id, reason,
 | Search | `GET search?q=&category=&author=&tag=&sort=` |
 | Members | `GET members`, `GET members/:id`, `GET members/:id/posts` |
 | Bookmarks | `POST toggle`, `GET list` |
-| Notifications | `GET list`, `GET unread-count`, `POST mark-read` |
-| Push | `POST device-token` (register on login), `DELETE device-token` (on logout) |
+| Notifications | `GET list`, `GET unread-count`, `POST {id}/read`, `POST mark-all-read` |
+| Push | `POST /me/devices/` (register/refresh token), `DELETE /me/devices/` (logout) |
 | Reports | `POST report` |
 | Settings | `PATCH profile`, `POST avatar`, `POST change-password` |
 | Attachments | `POST upload` (multipart), linked to post on create |
@@ -417,7 +421,7 @@ lib/
 - [ ] **r2-bookmarks** — toggle + bookmarks list
 - [ ] **r2-social** — quote, mention parsing, helpful reaction, accepted answer, unanswered filter
 - [ ] **r2-notifications** — reply/quote/mention service layer + notification screen + in-app badge polling
-- [ ] **r2-push** — FCM setup (Firebase project, Android first), `DeviceToken` model + register/unregister endpoints, server-side push send with app-icon badge count
+- [ ] **r2-push** — FCM setup per [`NOTIFICATIONS.md`](NOTIFICATIONS.md): Firebase project + service account, Celery/Redis, `DeviceToken` + `/me/devices/`, push send with iOS-exact / Android-best-effort badge
 - [ ] **r2-moderation** — report sheet, lock/pin/hide/delete, admin queue
 - [ ] **r3-members** — directory (top/new/online), profile with recent posts
 - [ ] **r3-polish** — loading/error/empty states, pagination, responsive layout, dark mode
@@ -448,10 +452,10 @@ Work in small, reviewable releases. After each release: run tests, list changed 
 - Helpful reaction
 - Accepted answer + unanswered list
 - Reply / quote / mention notifications (in-app)
-- Push notifications via FCM + app-icon badge (Android first; iOS once APNs is set up)
+- Push notifications via FCM + app-icon badge (iOS exact count; Android launcher-dependent; Android first for testing)
 - Reports + basic moderation (lock, pin, hide, delete)
 
-**Exit criteria:** A user gets notified — in-app and via a red app-icon badge — when someone responds to them, and can save threads for later.
+**Exit criteria:** A user gets notified — in-app and via push (with iOS numeric badge where supported) — when someone responds to them, and can save threads for later.
 
 ### Release 3 — Community expansion
 
