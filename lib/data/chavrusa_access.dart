@@ -25,23 +25,39 @@ class ChavrusaAccess extends ChangeNotifier {
   static bool _showInviteGate = false;
   static Future<void>? _resolveFuture;
 
+  /// Bumped on every auth transition (invalidate / markMember). A resolve that
+  /// began in an earlier auth cycle carries the old value and is discarded so
+  /// it can't overwrite or notify with stale gate state.
+  static int _generation = 0;
+
+  /// Transient RPC failures shouldn't permanently strand an authorized member
+  /// at the invite gate, but we also can't spin forever. Retry a couple of
+  /// times (each redirect re-runs us) and then settle on the usable invite
+  /// gate; a refresh or sign-in/out invalidates and retries cleanly.
+  static int _failures = 0;
+  static const _maxFailures = 2;
+
   static bool get gateResolved => _gateResolved;
   static bool get showInviteGate => _showInviteGate;
 
   static void invalidate() {
+    _generation++;
     _isMember = null;
     _requiresInvite = null;
     _gateResolved = false;
     _showInviteGate = false;
     _resolveFuture = null;
+    _failures = 0;
     instance.notifyListeners();
   }
 
   static void markMember() {
+    _generation++;
     _isMember = true;
     _showInviteGate = false;
     _gateResolved = true;
     _resolveFuture = null;
+    _failures = 0;
     instance.notifyListeners();
   }
 
@@ -60,42 +76,54 @@ class ChavrusaAccess extends ChangeNotifier {
   }
 
   static Future<void> _runResolve() async {
+    final gen = _generation;
     try {
-      await _resolve();
+      await _resolve(gen);
     } finally {
-      _resolveFuture = null;
-      // Notify exactly once per resolution so the (synchronous) redirect
-      // re-evaluates with the freshly cached gate state.
-      instance.notifyListeners();
+      // Only the resolve for the current auth cycle owns the shared future and
+      // the router re-evaluation notification; a superseded one stays silent.
+      if (gen == _generation) {
+        _resolveFuture = null;
+        instance.notifyListeners();
+      }
     }
   }
 
-  static Future<void> _resolve() async {
+  static Future<void> _resolve(int gen) async {
     if (_gateResolved) return;
     try {
       if (!AppConfig.isChavrusasSite || !authRepository.isSignedIn) {
-        _showInviteGate = false;
-        _gateResolved = true;
+        _commit(gen, showInviteGate: false);
         return;
       }
 
       await redeemPendingInviteIfAny();
+      // A successful redemption already marked the user a member (and bumped
+      // the generation); don't let the checks below flip the gate back on.
+      if (_gateResolved || gen != _generation) return;
 
       if (!await requiresInvite()) {
-        _showInviteGate = false;
-        _gateResolved = true;
+        _commit(gen, showInviteGate: false);
         return;
       }
 
       final member = await isMember();
-      _showInviteGate = !member;
-      _gateResolved = true;
+      _commit(gen, showInviteGate: !member);
     } catch (_) {
-      // A DB/RPC failure must not hang routing. Mark resolved but deny access
-      // (land on the invite gate); a later sign-in/out invalidates and retries.
-      _showInviteGate = true;
-      _gateResolved = true;
+      _failures++;
+      // Give up only after repeated failures so a transient blip doesn't
+      // strand a real member; landing on the invite gate beats a hung page.
+      if (_failures >= _maxFailures) {
+        _commit(gen, showInviteGate: true);
+      }
     }
+  }
+
+  static void _commit(int gen, {required bool showInviteGate}) {
+    if (gen != _generation) return; // superseded by invalidate()/markMember()
+    _showInviteGate = showInviteGate;
+    _gateResolved = true;
+    _failures = 0;
   }
 
   static Future<bool> requiresInvite() async {
