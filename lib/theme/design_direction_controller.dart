@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../config/app_config.dart';
 import 'app_colors.dart';
 import 'app_text.dart';
 import 'design_direction.dart';
@@ -22,6 +23,12 @@ class DesignDirectionController extends ChangeNotifier {
 
   /// Load saved direction from disk; defaults to Chavrusa Directory.
   Future<void> load() async {
+    // Chavrusas subdomain always uses directory chrome, regardless of saved prefs.
+    if (AppConfig.isChavrusasSite) {
+      _apply(DesignDirections.chavrusaDirectory, persist: false);
+      return;
+    }
+
     final prefs = await SharedPreferences.getInstance();
     final id = prefs.getString(_prefKey);
     if (id == null) return;

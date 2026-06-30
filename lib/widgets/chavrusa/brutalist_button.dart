@@ -13,6 +13,7 @@ class BrutalistButton extends StatefulWidget {
     this.icon,
     this.minHeight = 44,
     this.padding = const EdgeInsets.symmetric(horizontal: 18),
+    this.expandWidth = false,
   });
 
   final String label;
@@ -21,6 +22,7 @@ class BrutalistButton extends StatefulWidget {
   final Widget? icon;
   final double minHeight;
   final EdgeInsets padding;
+  final bool expandWidth;
 
   @override
   State<BrutalistButton> createState() => _BrutalistButtonState();
@@ -56,6 +58,7 @@ class _BrutalistButtonState extends State<BrutalistButton> {
         onTapCancel: enabled ? () => setState(() => _pressed = false) : null,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 120),
+          width: widget.expandWidth ? double.infinity : null,
           transform: Matrix4.translationValues(offset, offset, 0),
           decoration: BoxDecoration(
             color: enabled ? bg : bg.withValues(alpha: 0.55),
@@ -72,7 +75,8 @@ class _BrutalistButtonState extends State<BrutalistButton> {
             child: Padding(
               padding: widget.padding,
               child: Row(
-                mainAxisSize: MainAxisSize.min,
+                mainAxisSize:
+                    widget.expandWidth ? MainAxisSize.max : MainAxisSize.min,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   if (widget.icon != null) ...[
@@ -90,6 +94,71 @@ class _BrutalistButtonState extends State<BrutalistButton> {
                   ),
                 ],
               ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// White bordered surface with offset shadow — matches [BrutalistButton] secondary chrome.
+class BrutalistShell extends StatefulWidget {
+  const BrutalistShell({
+    super.key,
+    required this.child,
+    this.onTap,
+    this.minHeight = 48,
+    this.padding = const EdgeInsets.symmetric(horizontal: 14),
+  });
+
+  final Widget child;
+  final VoidCallback? onTap;
+  final double minHeight;
+  final EdgeInsets padding;
+
+  @override
+  State<BrutalistShell> createState() => _BrutalistShellState();
+}
+
+class _BrutalistShellState extends State<BrutalistShell> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = widget.onTap != null;
+    final offset = _pressed && enabled ? 3.0 : 0.0;
+    final shadow = _pressed && enabled ? 0.0 : 4.0;
+
+    return MouseRegion(
+      cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
+      child: GestureDetector(
+        onTapDown: enabled ? (_) => setState(() => _pressed = true) : null,
+        onTapUp: enabled
+            ? (_) {
+                setState(() => _pressed = false);
+                widget.onTap?.call();
+              }
+            : null,
+        onTapCancel: enabled ? () => setState(() => _pressed = false) : null,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          transform: Matrix4.translationValues(offset, offset, 0),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: ChavrusaDirectoryTheme.line),
+            boxShadow: [
+              BoxShadow(
+                color: ChavrusaDirectoryTheme.shadow,
+                offset: Offset(shadow, shadow),
+              ),
+            ],
+          ),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: widget.minHeight),
+            child: Padding(
+              padding: widget.padding,
+              child: widget.child,
             ),
           ),
         ),

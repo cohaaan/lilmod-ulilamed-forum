@@ -3,10 +3,12 @@ import 'package:go_router/go_router.dart';
 
 import '../data/repositories.dart';
 import '../models/category.dart';
+import '../models/chavrusa_listing.dart';
 import '../models/thread.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text.dart';
 import '../widgets/async.dart';
+import '../widgets/chavrusa/brutalist_button.dart';
 import '../widgets/post_card.dart';
 import '../widgets/soft_card.dart';
 import '../widgets/workspace_header.dart';
@@ -20,6 +22,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   late Future<(List<Category>, List<Thread>)> _future = _load();
+  int _chavrusaRefresh = 0;
 
   Future<(List<Category>, List<Thread>)> _load() async {
     final results = await Future.wait([
@@ -30,15 +33,21 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _refresh() async {
-    setState(() => _future = _load());
+    setState(() {
+      _future = _load();
+      _chavrusaRefresh++;
+    });
     await _future;
   }
 
   @override
   Widget build(BuildContext context) {
+    final brutalist = AppColors.useBrutalistChrome;
     final contentPad = AppColors.useAubergineHeader
         ? const EdgeInsets.fromLTRB(20, 16, 20, 24)
-        : const EdgeInsets.fromLTRB(20, 0, 20, 24);
+        : brutalist
+            ? const EdgeInsets.fromLTRB(0, 0, 0, 24)
+            : const EdgeInsets.fromLTRB(20, 0, 20, 24);
 
     return Scaffold(
       body: SafeArea(
@@ -49,52 +58,39 @@ class _HomeScreenState extends State<HomeScreen> {
           child: ListView(
             padding: contentPad,
             children: [
-              WorkspaceHeader(
-                title: 'Lilmod Ulilamed',
-                subtitle: 'Serious, respectful Torah discourse',
-                trailing: _AccountButton(),
-              ),
-              SizedBox(height: AppColors.useAubergineHeader ? 16 : 18),
-              _ChavrusaPromo(),
-              const SizedBox(height: 18),
-              GestureDetector(
-                onTap: () => context.go('/search'),
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: AppColors.useBrutalistChrome
-                        ? AppColors.surface
-                        : AppColors.surfaceMuted,
-                    borderRadius: BorderRadius.circular(
-                      AppColors.useBrutalistChrome ? 0 : 14,
-                    ),
-                    border: AppColors.useBrutalistChrome
-                        ? Border.all(color: AppColors.line)
-                        : null,
-                  ),
-                  child: Row(
+              if (brutalist) ...[
+                _ForumIndexHeader(trailing: _AccountButton()),
+                const SizedBox(height: 14),
+                Container(height: 6, color: AppColors.primary),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Icon(Icons.search_rounded,
-                          color: AppColors.muted, size: 20),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Search threads, sources…',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppText.sans(
-                            fontSize: 14,
-                            color: AppColors.muted,
-                          ),
-                        ),
-                      ),
+                      _ChavrusaActionBar(refreshKey: _chavrusaRefresh),
+                      const SizedBox(height: 12),
+                      _ForumSearchBar(onTap: () => context.go('/search')),
+                      const SizedBox(height: 24),
                     ],
                   ),
                 ),
-              ),
-              const SizedBox(height: 24),
-              AsyncView<(List<Category>, List<Thread>)>(
+              ] else ...[
+                WorkspaceHeader(
+                  title: 'Lilmod Ulilamed',
+                  subtitle: 'Serious, respectful Torah discourse',
+                  trailing: _AccountButton(),
+                ),
+                SizedBox(height: AppColors.useAubergineHeader ? 16 : 18),
+                _ChavrusaPromo(refreshKey: _chavrusaRefresh),
+                const SizedBox(height: 18),
+                _ForumSearchBar(onTap: () => context.go('/search')),
+                const SizedBox(height: 24),
+              ],
+              Padding(
+                padding: brutalist
+                    ? const EdgeInsets.symmetric(horizontal: 20)
+                    : EdgeInsets.zero,
+                child: AsyncView<(List<Category>, List<Thread>)>(
                 future: _future,
                 onRetry: _refresh,
                 builder: (context, data) {
@@ -129,9 +125,231 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   );
                 },
+                ),
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+String _forumIssueLabel() {
+  final now = DateTime.now();
+  final dd = now.day.toString().padLeft(2, '0');
+  final mm = now.month.toString().padLeft(2, '0');
+  return 'ISSUE $dd.$mm';
+}
+
+class _ForumIndexHeader extends StatelessWidget {
+  const _ForumIndexHeader({this.trailing});
+
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final titleStyle = AppText.display.copyWith(
+      fontSize: 28,
+      fontWeight: FontWeight.w800,
+      height: 1.0,
+      letterSpacing: -0.6,
+    );
+    final indexStyle = AppText.sans(
+      fontSize: 11,
+      fontWeight: FontWeight.w800,
+      letterSpacing: 0.6,
+      color: AppColors.ink,
+    );
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Lilmod', style: titleStyle),
+                Text('Ulilamed', style: titleStyle),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (trailing != null) trailing!,
+              const SizedBox(height: 8),
+              Text('FORUM INDEX', style: indexStyle),
+              Text(_forumIssueLabel(), style: indexStyle),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ChavrusaActionBar extends StatefulWidget {
+  const _ChavrusaActionBar({required this.refreshKey});
+
+  final int refreshKey;
+
+  @override
+  State<_ChavrusaActionBar> createState() => _ChavrusaActionBarState();
+}
+
+class _ChavrusaActionBarState extends State<_ChavrusaActionBar> {
+  static const _barHeight = 48.0;
+
+  late Future<ChavrusaListing?> _mineFuture = _fetch();
+
+  @override
+  void didUpdateWidget(_ChavrusaActionBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshKey != widget.refreshKey) {
+      setState(() => _mineFuture = _fetch());
+    }
+  }
+
+  Future<ChavrusaListing?> _fetch() => chavrusaRepository.fetchMyListing();
+
+  Future<void> _reload() async {
+    setState(() => _mineFuture = _fetch());
+    await _mineFuture;
+  }
+
+  Future<void> _openChavrusas() async {
+    await context.push('/chavrusas');
+    if (mounted) _reload();
+  }
+
+  Future<void> _openPost(ChavrusaListing? existing) async {
+    await context.push<bool>('/chavrusas/edit', extra: existing);
+    if (mounted) _reload();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<ChavrusaListing?>(
+      future: _mineFuture,
+      builder: (context, snapshot) {
+        final mine = snapshot.data;
+        final hasListing = mine != null;
+
+        final barLabel = hasListing
+            ? 'YOUR LISTING — ${mine.status.label.toUpperCase()} · ${mine.learningInterests.toUpperCase()}'
+            : 'FIND A CHAVRUSA / POST AVAILABILITY';
+
+        return SizedBox(
+          height: _barHeight,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: BrutalistShell(
+                  onTap: _openChavrusas,
+                  minHeight: _barHeight,
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      barLabel,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppText.sans(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.35,
+                        height: 1.2,
+                        color: AppColors.ink,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              SizedBox(
+                width: hasListing ? null : _barHeight,
+                child: BrutalistButton(
+                  label: hasListing ? 'Edit' : '+',
+                  style: hasListing
+                      ? BrutalistButtonStyle.secondary
+                      : BrutalistButtonStyle.primary,
+                  minHeight: _barHeight,
+                  padding: hasListing
+                      ? const EdgeInsets.symmetric(horizontal: 14)
+                      : EdgeInsets.zero,
+                  expandWidth: !hasListing,
+                  onPressed: () => _openPost(mine),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ForumSearchBar extends StatelessWidget {
+  const _ForumSearchBar({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final brutalist = AppColors.useBrutalistChrome;
+
+    if (brutalist) {
+      return BrutalistShell(
+        onTap: onTap,
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                'SEARCH ALL DISCUSSIONS',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppText.sans(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.35,
+                  color: AppColors.ink,
+                ),
+              ),
+            ),
+            Icon(Icons.search_rounded, color: AppColors.ink, size: 20),
+          ],
+        ),
+      );
+    }
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceMuted,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.search_rounded, color: AppColors.muted, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Search threads, sources…',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppText.sans(
+                  fontSize: 14,
+                  color: AppColors.muted,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -312,50 +530,101 @@ class _SubforumRow extends StatelessWidget {
   }
 }
 
-class _ChavrusaPromo extends StatelessWidget {
+class _ChavrusaPromo extends StatefulWidget {
+  const _ChavrusaPromo({required this.refreshKey});
+
+  final int refreshKey;
+
+  @override
+  State<_ChavrusaPromo> createState() => _ChavrusaPromoState();
+}
+
+class _ChavrusaPromoState extends State<_ChavrusaPromo> {
+  late Future<ChavrusaListing?> _mineFuture = _fetch();
+
+  @override
+  void didUpdateWidget(_ChavrusaPromo oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshKey != widget.refreshKey) {
+      setState(() => _mineFuture = _fetch());
+    }
+  }
+
+  Future<ChavrusaListing?> _fetch() => chavrusaRepository.fetchMyListing();
+
+  Future<void> _reload() async {
+    setState(() => _mineFuture = _fetch());
+    await _mineFuture;
+  }
+
+  Future<void> _openChavrusas() async {
+    await context.push('/chavrusas');
+    if (mounted) _reload();
+  }
+
+  Future<void> _openPost(ChavrusaListing? existing) async {
+    await context.push<bool>('/chavrusas/edit', extra: existing);
+    if (mounted) _reload();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return SoftCard(
-      onTap: () => context.push('/chavrusas'),
-      padding: const EdgeInsets.all(18),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: AppColors.indigo.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(Icons.groups_outlined, color: AppColors.indigo),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Find a chavrusa',
-                  style: AppText.sans(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.ink,
-                  ),
+    return FutureBuilder<ChavrusaListing?>(
+      future: _mineFuture,
+      builder: (context, snapshot) {
+        final mine = snapshot.data;
+        final hasListing = mine != null;
+
+        return SoftCard(
+          onTap: hasListing ? () => _openPost(mine) : _openChavrusas,
+          padding: const EdgeInsets.all(18),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: AppColors.indigo.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'By phone, during work hours, or whenever',
-                  style: AppText.sans(
-                    fontSize: 13,
-                    color: AppColors.muted,
-                  ),
+                child: Icon(
+                  hasListing ? Icons.edit_calendar_outlined : Icons.groups_outlined,
+                  color: AppColors.indigo,
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      hasListing ? 'Your chavrusa listing' : 'Find a chavrusa',
+                      style: AppText.sans(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.ink,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      hasListing
+                          ? '${mine.status.label} · ${mine.learningInterests} · ${mine.topic}'
+                          : 'By phone, during work hours, or whenever',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppText.sans(
+                        fontSize: 13,
+                        color: AppColors.muted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+            ],
           ),
-          Icon(Icons.chevron_right_rounded, color: AppColors.muted),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -387,6 +656,16 @@ class _EmptyRecent extends StatelessWidget {
 class _AccountButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    if (AppColors.useBrutalistChrome) {
+      return BrutalistButton(
+        label: 'Account',
+        style: BrutalistButtonStyle.login,
+        minHeight: 40,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        onPressed: () => context.push('/account'),
+      );
+    }
+
     final onBanner = AppColors.useAubergineHeader;
     final fg = onBanner ? Colors.white : AppColors.ink;
     final border = onBanner
