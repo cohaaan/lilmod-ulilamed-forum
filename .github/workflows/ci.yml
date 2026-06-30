@@ -21,6 +21,10 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
+          # Pinned to match local dev — `channel: stable` floats to the newest
+          # release, which flags deprecation infos (deprecated_member_use) that
+          # fail `flutter analyze` even though the code is fine on this version.
+          flutter-version: 3.32.2
           channel: stable
           cache: true
 
@@ -44,6 +48,10 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
+          # Pinned to match local dev — `channel: stable` floats to the newest
+          # release, which flags deprecation infos (deprecated_member_use) that
+          # fail `flutter analyze` even though the code is fine on this version.
+          flutter-version: 3.32.2
           channel: stable
           cache: true
 
