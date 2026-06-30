@@ -16,7 +16,9 @@ class PostCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = accentForId(thread.subforumId);
+    final accent = AppColors.useBrutalistChrome
+        ? AppColors.primary
+        : accentForId(thread.subforumId);
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: SoftCard(
@@ -37,27 +39,7 @@ class PostCard extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (thread.isNew) ...[
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.mint.withValues(alpha: 0.10),
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(
-                            color: AppColors.mint.withValues(alpha: 0.25),
-                          ),
-                        ),
-                        child: Text(
-                          'NEW',
-                          style: GoogleFonts.inter(
-                            fontSize: 9.5,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.mint,
-                          ),
-                        ),
-                      ),
+                      Tag(label: 'NEW', color: AppColors.mint),
                       const SizedBox(width: 8),
                     ],
                     Text(

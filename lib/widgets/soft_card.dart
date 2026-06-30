@@ -103,6 +103,34 @@ class Tag extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (AppColors.useBrutalistChrome) {
+      final fill = color ?? AppColors.primary;
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: fill,
+          border: Border.all(color: AppColors.line),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.shadow,
+              offset: const Offset(2, 2),
+            ),
+          ],
+        ),
+        child: Text(
+          label.toUpperCase(),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: AppText.sans(
+            fontSize: 9.5,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.5,
+            color: Colors.white,
+          ),
+        ),
+      );
+    }
+
     final c = color ?? AppColors.link;
     final radius = AppColors.usePillTags ? 999.0 : 4.0;
     return Container(
