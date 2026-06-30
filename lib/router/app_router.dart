@@ -39,44 +39,38 @@ final appRouter = GoRouter(
     _GoRouterRefreshStream(Supabase.instance.client.auth.onAuthStateChange),
     ChavrusaAccess.instance,
   ]),
-  redirect: (context, state) async {
+  // IMPORTANT: keep this redirect SYNCHRONOUS. ChavrusaAccess.instance is in
+  // refreshListenable above; an async redirect that awaits Supabase RPCs and
+  // then notifies that listenable re-triggers itself indefinitely and the page
+  // freezes (the Chavrusas invite-gate bug). All DB work happens off this path
+  // in ChavrusaAccess.ensureResolved(); here we only read cached state.
+  redirect: (context, state) {
     final signedIn = Supabase.instance.client.auth.currentUser != null;
     final atLogin = state.matchedLocation == '/login';
     final home = AppConfig.defaultSignedInRoute;
+    final chavrusas = AppConfig.isChavrusasSite;
 
-    final oauthCallback = kIsWeb &&
-        (isOAuthCallbackUri(state.uri) || isOAuthCallbackUri(Uri.base));
-
-    // OAuth lands on /?code=… — strip params and route appropriately.
-    if (oauthCallback) {
-      if (!signedIn) {
-        clearOAuthParamsFromBrowserUrl();
-        return '/login';
-      }
+    // OAuth (PKCE) lands on /?code=… — strip the spent params so a refresh
+    // can't re-exchange a dead code and so this check stops matching. Pure
+    // side effect; we then fall through to normal auth routing.
+    if (kIsWeb &&
+        (isOAuthCallbackUri(state.uri) || isOAuthCallbackUri(Uri.base))) {
       clearOAuthParamsFromBrowserUrl();
-    }
-
-    try {
-      if (signedIn && AppConfig.isChavrusasSite) {
-        await ChavrusaAccess.redeemPendingInviteIfAny();
-        await ChavrusaAccess.resolveLoginGate();
-      } else if (AppConfig.isChavrusasSite && atLogin) {
-        await ChavrusaAccess.resolveLoginGate();
-      }
-    } catch (_) {
-      if (AppConfig.isChavrusasSite) return '/login';
     }
 
     if (!signedIn) return atLogin ? null : '/login';
 
-    if (AppConfig.isChavrusasSite && !await ChavrusaAccess.hasAccess()) {
-      return atLogin ? null : '/login';
+    // Chavrusas subdomain is invite-gated. Resolve membership in the
+    // background and gate on the cached result; never await here.
+    if (chavrusas) {
+      ChavrusaAccess.ensureResolved();
+      if (!ChavrusaAccess.gateResolved || ChavrusaAccess.showInviteGate) {
+        return atLogin ? null : '/login';
+      }
     }
 
     if (atLogin) return home;
-    if (AppConfig.isChavrusasSite && state.matchedLocation == '/') {
-      return '/chavrusas';
-    }
+    if (chavrusas && state.matchedLocation == '/') return '/chavrusas';
     return null;
   },
   routes: [

@@ -58,7 +58,14 @@ class _LoginScreenState extends State<LoginScreen> {
       _email.text = 'philo@demo.lilmod.app';
       _password.text = 'Lilmod2026!';
     }
+    // Gate resolution runs in the background (off the router redirect). Rebuild
+    // when it settles so the "resolving" spinner can never get stuck.
+    ChavrusaAccess.instance.addListener(_onAccessChanged);
     _restoreInviteUnlock();
+  }
+
+  void _onAccessChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _restoreInviteUnlock() async {
@@ -70,6 +77,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
+    ChavrusaAccess.instance.removeListener(_onAccessChanged);
     _invite.dispose();
     _name.dispose();
     _email.dispose();
