@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../models/article_item.dart';
 import '../theme/app_colors.dart';
+import 'soft_card.dart';
 
 class ArticleCard extends StatelessWidget {
   const ArticleCard({super.key, required this.article});
@@ -12,54 +13,55 @@ class ArticleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => context.go('/articles/${article.slug}'),
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          width: double.infinity,
-          margin: const EdgeInsets.only(bottom: 10),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.forumAccentSoft(article.accentColor),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.line),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '${article.category} · ${article.date}',
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.muted,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: SoftCard(
+        onTap: () => context.push('/articles/${article.slug}'),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Flexible(
+                  child: Tag(
+                    label: article.category,
+                    color: article.accentColor,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                article.title,
-                style: GoogleFonts.playfairDisplay(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.ink,
-                  height: 1.2,
-                ),
-              ),
-              if (article.excerpt != null) ...[
-                const SizedBox(height: 8),
+                const SizedBox(width: 8),
                 Text(
-                  article.excerpt!,
+                  article.date,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.inter(
-                    fontSize: 14,
+                    fontSize: 12,
                     color: AppColors.muted,
-                    height: 1.5,
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              article.title,
+              style: GoogleFonts.inter(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                height: 1.3,
+                color: AppColors.ink,
+              ),
+            ),
+            if (article.excerpt != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                article.excerpt!,
+                style: GoogleFonts.inter(
+                  fontSize: 13.5,
+                  height: 1.5,
+                  color: AppColors.muted,
+                ),
+              ),
             ],
-          ),
+          ],
         ),
       ),
     );

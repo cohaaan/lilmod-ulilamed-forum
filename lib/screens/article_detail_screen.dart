@@ -2,78 +2,87 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../data/mock_data.dart';
-import '../models/article_item.dart';
+import '../data/articles_data.dart';
 import '../theme/app_colors.dart';
-import '../widgets/content_panel.dart';
-import '../widgets/site_scaffold.dart';
+import '../widgets/soft_card.dart';
 
 class ArticleDetailScreen extends StatelessWidget {
   const ArticleDetailScreen({super.key, required this.slug});
 
   final String slug;
 
-  ArticleItem _findArticle() {
-    return MockData.allArticles.firstWhere(
-      (article) => article.slug == slug,
-      orElse: () => MockData.allArticles.first,
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final article = _findArticle();
+    final article = ArticlesData.bySlug(slug);
 
-    return SiteScaffold(
-      child: ContentPanel(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TextButton.icon(
-              onPressed: () => context.go('/articles'),
-              icon: const Icon(Icons.arrow_back),
-              label: const Text('Back to articles'),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '${article.category} · ${article.date}',
-              style: GoogleFonts.inter(
-                fontWeight: FontWeight.w700,
-                color: AppColors.muted,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              article.title,
-              style: GoogleFonts.playfairDisplay(
-                fontSize: 34,
-                fontWeight: FontWeight.w700,
-                color: AppColors.ink,
-                height: 1.15,
-              ),
-            ),
-            if (article.excerpt != null) ...[
-              const SizedBox(height: 12),
+    return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () =>
+              context.canPop() ? context.pop() : context.go('/articles'),
+        ),
+        title: Text(
+          'Article',
+          style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700),
+        ),
+        actions: [
+          IconButton(
+            onPressed: null,
+            icon: Icon(Icons.bookmark_border_rounded, color: AppColors.ink),
+          ),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+        children: [
+          Row(
+            children: [
+              Tag(label: article.category, color: article.accentColor),
+              const SizedBox(width: 8),
               Text(
-                article.excerpt!,
+                article.date,
                 style: GoogleFonts.inter(
-                  fontSize: 16,
+                  fontSize: 12.5,
                   color: AppColors.muted,
-                  height: 1.6,
                 ),
               ),
             ],
-            const SizedBox(height: 24),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            article.title,
+            style: GoogleFonts.inter(
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              height: 1.25,
+              color: AppColors.ink,
+              letterSpacing: -0.3,
+            ),
+          ),
+          if (article.excerpt != null) ...[
+            const SizedBox(height: 12),
             Text(
-              'Article body will load here once the backend is connected.',
+              article.excerpt!,
               style: GoogleFonts.inter(
                 fontSize: 15,
-                height: 1.7,
-                color: AppColors.ink,
+                height: 1.6,
+                color: AppColors.body,
               ),
             ),
           ],
-        ),
+          const SizedBox(height: 20),
+          SoftCard(
+            child: Text(
+              'The article body will load here once the backend is connected.',
+              style: GoogleFonts.inter(
+                fontSize: 14.5,
+                height: 1.7,
+                color: AppColors.body,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

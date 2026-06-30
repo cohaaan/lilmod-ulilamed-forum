@@ -1,257 +1,410 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 
-import '../data/mock_data.dart';
+import '../data/repositories.dart';
+import '../models/category.dart';
+import '../models/thread.dart';
 import '../theme/app_colors.dart';
-import '../widgets/article_card.dart';
-import '../widgets/content_panel.dart';
-import '../widgets/hero_section.dart';
-import '../widgets/site_scaffold.dart';
-import '../widgets/thread_row.dart';
+import '../theme/app_text.dart';
+import '../widgets/async.dart';
+import '../widgets/post_card.dart';
+import '../widgets/soft_card.dart';
+import '../widgets/workspace_header.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  late Future<(List<Category>, List<Thread>)> _future = _load();
+
+  Future<(List<Category>, List<Thread>)> _load() async {
+    final results = await Future.wait([
+      forumRepository.fetchCategories(),
+      forumRepository.fetchRecentThreads(limit: 12),
+    ]);
+    return (results[0] as List<Category>, results[1] as List<Thread>);
+  }
+
+  Future<void> _refresh() async {
+    setState(() => _future = _load());
+    await _future;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return SiteScaffold(
-      showHero: true,
-      hero: const HeroSection(),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final wide = constraints.maxWidth >= 980;
+    final contentPad = AppColors.useAubergineHeader
+        ? const EdgeInsets.fromLTRB(20, 16, 20, 24)
+        : const EdgeInsets.fromLTRB(20, 0, 20, 24);
 
-          final mainColumn = Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Scaffold(
+      body: SafeArea(
+        bottom: false,
+        top: !AppColors.useAubergineHeader,
+        child: RefreshIndicator(
+          onRefresh: _refresh,
+          child: ListView(
+            padding: contentPad,
             children: [
-              ContentPanel(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    SectionHeading(
-                      eyebrow: 'Forums',
-                      title: 'Recent discussions',
-                      actionLabel: 'Active topics',
-                      onAction: () => context.go('/forums'),
-                    ),
-                    const SizedBox(height: 16),
-                    ...MockData.recentThreads.map(
-                      (thread) => ThreadRow(thread: thread),
-                    ),
-                  ],
-                ),
+              WorkspaceHeader(
+                title: 'Lilmod Ulilamed',
+                subtitle: 'Serious, respectful Torah discourse',
+                trailing: _AccountButton(),
               ),
-              const SizedBox(height: 16),
-              ContentPanel(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    SectionHeading(
-                      eyebrow: 'Articles',
-                      title: 'Featured writing',
-                      actionLabel: 'All articles',
-                      onAction: () => context.go('/articles'),
+              SizedBox(height: AppColors.useAubergineHeader ? 16 : 18),
+              _ChavrusaPromo(),
+              const SizedBox(height: 18),
+              GestureDetector(
+                onTap: () => context.go('/search'),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: AppColors.useBrutalistChrome
+                        ? AppColors.surface
+                        : AppColors.surfaceMuted,
+                    borderRadius: BorderRadius.circular(
+                      AppColors.useBrutalistChrome ? 0 : 14,
                     ),
-                    const SizedBox(height: 16),
-                    ...MockData.featuredArticles.map(
-                      (article) => ArticleCard(article: article),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          );
-
-          final sidebar = Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              ContentPanel(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      'Popular Topics',
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                    const SizedBox(height: 12),
-                    ...MockData.popularThreads.map(
-                      (thread) => SidebarThreadRow(thread: thread),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              ContentPanel(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Community Standards',
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                    const SizedBox(height: 12),
-                    ...MockData.communityStandards.map(
-                      (standard) => Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('•  '),
-                            Expanded(
-                              child: Text(
-                                standard,
-                                style: GoogleFonts.inter(
-                                  fontSize: 14,
-                                  height: 1.45,
-                                  color: AppColors.ink,
-                                ),
-                              ),
-                            ),
-                          ],
+                    border: AppColors.useBrutalistChrome
+                        ? Border.all(color: AppColors.line)
+                        : null,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.search_rounded,
+                          color: AppColors.muted, size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Search threads, sources…',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppText.sans(
+                            fontSize: 14,
+                            color: AppColors.muted,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 16),
-              ContentPanel(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Forum snapshot',
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 12,
-                      children: [
-                        _StatChip(
-                          value: '${MockData.forumStats['threads']}',
-                          label: 'threads',
-                        ),
-                        _StatChip(
-                          value: '${MockData.forumStats['posts']}',
-                          label: 'posts',
-                        ),
-                        _StatChip(
-                          value: '${MockData.forumStats['articles']}',
-                          label: 'Articles',
-                        ),
-                        _StatChip(
-                          value: '${MockData.forumStats['members']}',
-                          label: 'Members',
-                        ),
-                        _StatChip(
-                          value: '${MockData.forumStats['online']}',
-                          label: 'online',
-                          highlight: true,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      'Online: ${MockData.onlineMembers.join(', ')}',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        color: AppColors.muted,
+              const SizedBox(height: 24),
+              AsyncView<(List<Category>, List<Thread>)>(
+                future: _future,
+                onRetry: _refresh,
+                builder: (context, data) {
+                  final categories = data.$1;
+                  final recent = data.$2;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SectionHeading(
+                        title: 'Latest discussions',
+                        actionLabel: 'All',
+                        onAction: () => context.go('/forums'),
                       ),
-                    ),
-                  ],
-                ),
+                      const SizedBox(height: 12),
+                      if (recent.isEmpty)
+                        _EmptyRecent()
+                      else
+                        ...recent.map((t) => PostCard(thread: t)),
+                      const SizedBox(height: 18),
+                      SectionHeading(
+                        title: 'Forums',
+                        actionLabel: 'See all',
+                        onAction: () => context.go('/forums'),
+                      ),
+                      const SizedBox(height: 12),
+                      for (var i = 0; i < categories.length; i++)
+                        _CategoryPanel(
+                          category: categories[i],
+                          accent: AppColors.accentAt(i),
+                          initiallyExpanded: false,
+                        ),
+                    ],
+                  );
+                },
               ),
             ],
-          );
-
-          final lower = ContentPanel(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'Source requests',
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                const SizedBox(height: 12),
-                ...MockData.sourceRequests.map(
-                  (thread) => MiniRow(thread: thread),
-                ),
-              ],
-            ),
-          );
-
-          if (wide) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(flex: 7, child: mainColumn),
-                    const SizedBox(width: 16),
-                    Expanded(flex: 4, child: sidebar),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                lower,
-              ],
-            );
-          }
-
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              mainColumn,
-              const SizedBox(height: 16),
-              sidebar,
-              const SizedBox(height: 16),
-              lower,
-            ],
-          );
-        },
+          ),
+        ),
       ),
     );
   }
 }
 
-class _StatChip extends StatelessWidget {
-  const _StatChip({
-    required this.value,
-    required this.label,
-    this.highlight = false,
+/// A category that expands to reveal its subforums in place.
+class _CategoryPanel extends StatefulWidget {
+  const _CategoryPanel({
+    required this.category,
+    required this.accent,
+    this.initiallyExpanded = false,
   });
 
-  final String value;
-  final String label;
-  final bool highlight;
+  final Category category;
+  final Color accent;
+  final bool initiallyExpanded;
+
+  @override
+  State<_CategoryPanel> createState() => _CategoryPanelState();
+}
+
+class _CategoryPanelState extends State<_CategoryPanel> {
+  late bool _expanded = widget.initiallyExpanded;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: highlight
-            ? AppColors.mint.withValues(alpha: 0.14)
-            : AppColors.surfaceSoft,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.line),
-      ),
-      child: RichText(
-        text: TextSpan(
-          style: GoogleFonts.inter(fontSize: 12, color: AppColors.muted),
+    final cat = widget.category;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: SoftCard(
+        padding: EdgeInsets.zero,
+        child: Column(
           children: [
-            TextSpan(
-              text: value,
-              style: GoogleFonts.inter(
-                fontWeight: FontWeight.w900,
-                color: AppColors.ink,
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => setState(() => _expanded = !_expanded),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 4,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: widget.accent,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              cat.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppText.sans(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.ink,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${cat.subforums.length} subforums · ${cat.threadCount} threads',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppText.sans(
+                                fontSize: 12.5,
+                                color: AppColors.muted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      AnimatedRotation(
+                        turns: _expanded ? 0.5 : 0,
+                        duration: const Duration(milliseconds: 180),
+                        child: Icon(Icons.keyboard_arrow_down_rounded,
+                            color: AppColors.muted),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
-            TextSpan(text: label),
+            AnimatedCrossFade(
+              firstChild: const SizedBox(width: double.infinity),
+              secondChild: Column(
+                children: [
+                  Divider(height: 1, color: AppColors.line),
+                  for (final sub in cat.subforums)
+                    _SubforumRow(
+                      categoryId: cat.id,
+                      subforumId: sub.id,
+                      name: sub.name,
+                      threadCount: sub.threadCount,
+                      accent: widget.accent,
+                    ),
+                ],
+              ),
+              crossFadeState: _expanded
+                  ? CrossFadeState.showSecond
+                  : CrossFadeState.showFirst,
+              duration: const Duration(milliseconds: 180),
+            ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _SubforumRow extends StatelessWidget {
+  const _SubforumRow({
+    required this.categoryId,
+    required this.subforumId,
+    required this.name,
+    required this.threadCount,
+    required this.accent,
+  });
+
+  final String categoryId;
+  final String subforumId;
+  final String name;
+  final int threadCount;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => context.go('/forums/c/$categoryId/s/$subforumId'),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 13, 16, 13),
+          child: Row(
+            children: [
+              Container(
+                width: 7,
+                height: 7,
+                decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppText.sans(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.ink,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                '$threadCount',
+                style: AppText.sans(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.muted,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Icon(Icons.chevron_right_rounded,
+                  size: 18, color: AppColors.muted),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ChavrusaPromo extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return SoftCard(
+      onTap: () => context.push('/chavrusas'),
+      padding: const EdgeInsets.all(18),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: AppColors.indigo.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(Icons.groups_outlined, color: AppColors.indigo),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Find a chavrusa',
+                  style: AppText.sans(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.ink,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'By phone, during work hours, or whenever',
+                  style: AppText.sans(
+                    fontSize: 13,
+                    color: AppColors.muted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyRecent extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return SoftCard(
+      child: Column(
+        children: [
+          Icon(Icons.forum_outlined, size: 40, color: AppColors.muted),
+          const SizedBox(height: 10),
+          Text(
+            'No discussions yet — be the first to start one.',
+            textAlign: TextAlign.center,
+            style: AppText.sans(fontSize: 14, color: AppColors.muted),
+          ),
+          const SizedBox(height: 12),
+          ElevatedButton(
+            onPressed: () => context.go('/forums'),
+            child: const Text('Browse forums'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AccountButton extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final onBanner = AppColors.useAubergineHeader;
+    final fg = onBanner ? Colors.white : AppColors.ink;
+    final border = onBanner
+        ? Colors.white.withValues(alpha: 0.35)
+        : AppColors.line;
+
+    return InkWell(
+      onTap: () => context.push('/account'),
+      customBorder: const CircleBorder(),
+      child: Container(
+        width: 44,
+        height: 44,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: border),
+        ),
+        child: Icon(Icons.person_outline_rounded, color: fg, size: 22),
       ),
     );
   }
