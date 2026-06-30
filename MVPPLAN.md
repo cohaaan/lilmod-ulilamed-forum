@@ -408,7 +408,7 @@ lib/
 
 ## Implementation todos
 
-- [ ] **r1-backend-scaffold** — Django/DRF/Postgres in `backend/`, JWT auth, User/MemberProfile, docker-compose, Django Admin
+- [x] **r1-backend-scaffold** — Django/DRF/Postgres in `backend/`, JWT auth, User/MemberProfile, docker-compose, Django Admin
 - [ ] **r1-forum-models** — Category, Subforum, Thread, Post, Attachment; seed 6 categories + sample content
 - [ ] **r1-api-core** — auth, home, forums, threads/posts CRUD, attachments, basic profiles
 - [ ] **r1-flutter-core** — Riverpod, dio, auth flow, go_router (MVP routes), repository layer
