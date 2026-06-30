@@ -1,10 +1,12 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/app_config.dart';
+import '../data/chavrusa_access.dart';
 import '../models/chavrusa_listing.dart';
 import '../models/seforim.dart';
 import '../screens/account_screen.dart';
@@ -25,6 +27,7 @@ import '../screens/seforim/seforim_search_screen.dart';
 import '../screens/subforum_screen.dart';
 import '../screens/theme_preview_screen.dart';
 import '../screens/thread_detail_screen.dart';
+import '../utils/oauth_callback.dart';
 import '../widgets/scaffold_with_nav_bar.dart';
 
 final _rootKey = GlobalKey<NavigatorState>();
@@ -32,13 +35,44 @@ final _rootKey = GlobalKey<NavigatorState>();
 final appRouter = GoRouter(
   initialLocation: AppConfig.defaultSignedInRoute,
   navigatorKey: _rootKey,
-  refreshListenable:
-      _GoRouterRefreshStream(Supabase.instance.client.auth.onAuthStateChange),
-  redirect: (context, state) {
+  refreshListenable: Listenable.merge([
+    _GoRouterRefreshStream(Supabase.instance.client.auth.onAuthStateChange),
+    ChavrusaAccess.instance,
+  ]),
+  redirect: (context, state) async {
     final signedIn = Supabase.instance.client.auth.currentUser != null;
     final atLogin = state.matchedLocation == '/login';
     final home = AppConfig.defaultSignedInRoute;
+
+    final oauthCallback = kIsWeb &&
+        (isOAuthCallbackUri(state.uri) || isOAuthCallbackUri(Uri.base));
+
+    // OAuth lands on /?code=… — strip params and route appropriately.
+    if (oauthCallback) {
+      if (!signedIn) {
+        clearOAuthParamsFromBrowserUrl();
+        return '/login';
+      }
+      clearOAuthParamsFromBrowserUrl();
+    }
+
+    try {
+      if (signedIn && AppConfig.isChavrusasSite) {
+        await ChavrusaAccess.redeemPendingInviteIfAny();
+        await ChavrusaAccess.resolveLoginGate();
+      } else if (AppConfig.isChavrusasSite && atLogin) {
+        await ChavrusaAccess.resolveLoginGate();
+      }
+    } catch (_) {
+      if (AppConfig.isChavrusasSite) return '/login';
+    }
+
     if (!signedIn) return atLogin ? null : '/login';
+
+    if (AppConfig.isChavrusasSite && !await ChavrusaAccess.hasAccess()) {
+      return atLogin ? null : '/login';
+    }
+
     if (atLogin) return home;
     if (AppConfig.isChavrusasSite && state.matchedLocation == '/') {
       return '/chavrusas';
@@ -189,7 +223,12 @@ final appRouter = GoRouter(
 class _GoRouterRefreshStream extends ChangeNotifier {
   _GoRouterRefreshStream(Stream<dynamic> stream) {
     notifyListeners();
-    _sub = stream.asBroadcastStream().listen((_) => notifyListeners());
+    // onError so an auth-stream error can't become an uncaught zone error;
+    // still refresh so the router re-evaluates (and clears any stale ?code=).
+    _sub = stream.asBroadcastStream().listen(
+      (_) => notifyListeners(),
+      onError: (_) => notifyListeners(),
+    );
   }
 
   late final StreamSubscription<dynamic> _sub;

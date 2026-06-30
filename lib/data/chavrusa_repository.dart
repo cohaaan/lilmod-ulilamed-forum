@@ -61,4 +61,40 @@ class ChavrusaRepository {
     if (uid == null) return;
     await _client.from('chavrusa_listings').delete().eq('user_id', uid);
   }
+
+  Future<bool> requiresInvite() async {
+    final result = await _client.rpc('chavrusa_requires_invite');
+    return result == true;
+  }
+
+  Future<bool> isMember() async {
+    if (_uid == null) return false;
+    final result = await _client.rpc('is_chavrusa_member');
+    return result == true;
+  }
+
+  /// Pre-auth check — returns null when valid, otherwise an error message.
+  Future<String?> validateInvite(String code) async {
+    final result = await _client.rpc('validate_chavrusa_invite', params: {
+      'p_code': code.trim(),
+    });
+    final map = Map<String, dynamic>.from(result as Map);
+    if (map['valid'] == true) return null;
+    return (map['message'] as String?) ?? 'Invalid invite code';
+  }
+
+  Future<void> redeemInvite(String code) async {
+    try {
+      await _client.rpc('redeem_chavrusa_invite', params: {
+        'p_code': code.trim(),
+      });
+    } on PostgrestException catch (e) {
+      throw Exception(e.message);
+    }
+  }
+
+  Future<String> createInviteCode() async {
+    final result = await _client.rpc('create_chavrusa_invite');
+    return result as String;
+  }
 }

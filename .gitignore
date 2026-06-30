@@ -36,6 +36,14 @@ migrate_working_dir/
 # Vercel
 .vercel
 
+# Agent skills (installed locally via `npx skills add`, not committed)
+.agents/
+.claude/skills/
+.cursor/
+
+# Build artifacts
+android/build/
+
 # Symbolication related
 app.*.symbols
 

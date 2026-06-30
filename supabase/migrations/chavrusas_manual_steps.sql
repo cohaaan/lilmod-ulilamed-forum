@@ -117,3 +117,27 @@ grant execute on function public.record_chavrusa_page_visit () to authenticated;
 -- STEP 5: learning details (what to learn — pace, level, goal)
 alter table public.chavrusa_listings
   add column if not exists learning_details text not null default '';
+
+-- STEP 6: invite codes (run full file 20250630170000_chavrusa_invite_codes.sql,
+-- or paste sections below if the dashboard times out)
+
+-- Create a single-use invite for someone:
+-- insert into public.chavrusa_invite_codes (code, max_uses, note)
+-- values ('4729', 1, 'for Yossi');
+
+-- Beta launch code (share with early users):
+-- insert into public.chavrusa_invite_codes (code, max_uses, note)
+-- values ('261836', 999999, 'Beta launch code')
+-- on conflict (code) do nothing;
+
+-- Create a multi-use beta code:
+-- insert into public.chavrusa_invite_codes (code, max_uses, note)
+-- values ('1234', 10, 'beta batch');
+
+-- Later: let members invite others (phase 2):
+-- update public.chavrusa_settings set value = 'true'::jsonb
+-- where key = 'member_invites_enabled';
+
+-- Later: open registration without codes:
+-- update public.chavrusa_settings set value = 'false'::jsonb
+-- where key = 'require_invite_code';

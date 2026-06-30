@@ -36,6 +36,11 @@ class AuthRepository {
   }
 
   Future<void> signInWithGoogle() async {
+    // Web uses the PKCE flow: Google returns to this origin with `?code=...` in
+    // the query, which Supabase exchanges for a session (detectSessionInUri).
+    // Redirect to the bare origin only — appending a path/#fragment, or an origin
+    // not in Supabase's Redirect URL allow-list, breaks the callback. The allow-
+    // list must include this exact origin (e.g. https://chavrusas.lilmodulilamed.com).
     await _client.auth.signInWithOAuth(
       OAuthProvider.google,
       redirectTo: kIsWeb ? Uri.base.origin : SupabaseConfig.oauthRedirect,
