@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../config/app_config.dart';
 import '../config/supabase_config.dart';
 
 /// Thin wrapper over Supabase Auth.
@@ -43,7 +44,9 @@ class AuthRepository {
     // list must include this exact origin (e.g. https://chavrusas.lilmodulilamed.com).
     await _client.auth.signInWithOAuth(
       OAuthProvider.google,
-      redirectTo: kIsWeb ? Uri.base.origin : SupabaseConfig.oauthRedirect,
+      redirectTo: kIsWeb
+          ? AppConfig.webOAuthRedirectOrigin
+          : SupabaseConfig.oauthRedirect,
       authScreenLaunchMode:
           kIsWeb ? LaunchMode.platformDefault : LaunchMode.externalApplication,
     );
