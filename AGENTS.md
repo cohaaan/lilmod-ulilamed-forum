@@ -1,4 +1,4 @@
-# CLAUDE.md — Lilmod Ulilamed forum
+# AGENTS.md — Lilmod Ulilamed forum
 
 A real Flutter forum app backed by **Supabase**. Not mock data — threads, replies,
 likes, bookmarks, auth all hit the live DB.
@@ -20,19 +20,3 @@ Google OAuth credentials, email-confirm toggle, Apple Developer account + Sign i
 ## Commands
 - `flutter run` / `flutter run -d chrome`
 - `flutter analyze` (keep clean), `flutter test`
-
-## Agent skills
-
-Engineering skills from `mattpocock/skills` are installed under `.agents/skills/` (gitignored; re-install with `npx skills add mattpocock/skills`). Config below was written by `/setup-matt-pocock-skills`.
-
-### Issue tracker
-
-GitHub Issues on `cohaaan/lilmod-ulilamed-forum` via the `gh` CLI. External PRs **are** a triage surface. See `docs/agents/issue-tracker.md`.
-
-### Triage labels
-
-Canonical defaults (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`) — not yet created on the repo. See `docs/agents/triage-labels.md`.
-
-### Domain docs
-
-Multi-context: `CONTEXT-MAP.md` at root indexes per-context glossaries under `docs/context/` (Forum, Auth, Chavrusa, Seforim), created lazily by `/domain-modeling`. ADRs in `docs/adr/`. See `docs/agents/domain.md`.
