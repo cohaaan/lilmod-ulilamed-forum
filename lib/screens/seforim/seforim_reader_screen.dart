@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -54,8 +55,23 @@ class SeforimReaderScreen extends StatefulWidget {
 }
 
 class _SeforimReaderScreenState extends State<SeforimReaderScreen> {
+  final ScrollController _controller = ScrollController();
+
+  /// Anchors the scroll position of the section that first loaded, so that
+  /// prepending an earlier section above it doesn't jump the viewport.
+  final GlobalKey _centerKey = GlobalKey();
+
+  /// Contiguous sections currently loaded, top → bottom. Grows as the reader
+  /// scrolls: [SeforimPassage.next] appends the section below, [prev] prepends
+  /// the one above. The repository's passage cache backs the fetches.
+  final List<SeforimPassage> _sections = [];
+
+  /// Index within [_sections] of the first-loaded section (the scroll anchor).
+  /// Prepends insert above it and bump this; appends go below.
+  int _anchorIndex = 0;
+
   late String _ref = widget.reference;
-  late Future<SeforimPassage> _future = seforimRepository.fetchPassage(_ref);
+  late Future<SeforimPassage> _future = _loadInitial(_ref);
   _ReaderLang _lang = _ReaderLang.both;
 
   /// Ref of the currently-selected verse (e.g. "Genesis 1:3"), or null.
@@ -63,12 +79,108 @@ class _SeforimReaderScreenState extends State<SeforimReaderScreen> {
   /// active at a time.
   String? _selectedRef;
 
-  void _load(String ref) {
+  bool _loadingNext = false;
+  bool _loadingPrev = false;
+  bool _appendFailed = false;
+  bool _prependFailed = false;
+
+  /// Distance (px) from an edge at which we start fetching the adjacent
+  /// section — far enough that the next page is usually ready before it shows.
+  static const _fetchThreshold = 900.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _controller.removeListener(_onScroll);
+    _controller.dispose();
+    super.dispose();
+  }
+
+  /// (Re)load from a fresh reference: reset the accumulated sections and seed
+  /// the list with the first section once it resolves. Returning the seeding
+  /// future means [AsyncView] shows the loading/error/retry states, and
+  /// [_sections] is already populated by the time the builder runs.
+  Future<SeforimPassage> _loadInitial(String ref) {
+    _sections.clear();
+    _anchorIndex = 0;
+    _loadingNext = _loadingPrev = false;
+    _appendFailed = _prependFailed = false;
+    return seforimRepository.fetchPassage(ref).then((p) {
+      _sections.add(p);
+      return p;
+    });
+  }
+
+  void _reload(String ref) {
     setState(() {
       _ref = ref;
-      _future = seforimRepository.fetchPassage(ref);
       _selectedRef = null;
+      _future = _loadInitial(ref);
     });
+  }
+
+  void _onScroll() {
+    if (!_controller.hasClients || _sections.isEmpty) return;
+    final pos = _controller.position;
+    if (pos.pixels >= pos.maxScrollExtent - _fetchThreshold) {
+      _appendNext();
+    }
+    // Only prepend when the user is actively scrolling up, so a cold deep-link
+    // to a mid-book ref doesn't cascade-load the whole book above it on open.
+    if (pos.userScrollDirection == ScrollDirection.forward &&
+        pos.pixels <= pos.minScrollExtent + _fetchThreshold) {
+      _prependPrev();
+    }
+  }
+
+  Future<void> _appendNext() async {
+    if (_loadingNext || _appendFailed || _sections.isEmpty) return;
+    final nextRef = _sections.last.next;
+    if (nextRef == null) return;
+    setState(() => _loadingNext = true);
+    try {
+      final p = await seforimRepository.fetchPassage(nextRef);
+      if (!mounted) return;
+      setState(() {
+        _loadingNext = false;
+        if (!_sections.any((s) => s.ref == p.ref)) _sections.add(p);
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loadingNext = false;
+        _appendFailed = true;
+      });
+    }
+  }
+
+  Future<void> _prependPrev() async {
+    if (_loadingPrev || _prependFailed || _sections.isEmpty) return;
+    final prevRef = _sections.first.prev;
+    if (prevRef == null) return;
+    setState(() => _loadingPrev = true);
+    try {
+      final p = await seforimRepository.fetchPassage(prevRef);
+      if (!mounted) return;
+      setState(() {
+        _loadingPrev = false;
+        if (!_sections.any((s) => s.ref == p.ref)) {
+          _sections.insert(0, p);
+          _anchorIndex += 1;
+        }
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loadingPrev = false;
+        _prependFailed = true;
+      });
+    }
   }
 
   /// Toggle selection of a verse (tapping the active verse deselects it).
@@ -161,9 +273,9 @@ class _SeforimReaderScreenState extends State<SeforimReaderScreen> {
       ),
       body: AsyncView<SeforimPassage>(
         future: _future,
-        onRetry: () => _load(_ref),
+        onRetry: () => _reload(_ref),
         builder: (context, p) {
-          if (p.segments.isEmpty) {
+          if (_sections.isEmpty || p.segments.isEmpty) {
             return Center(
               child: Text(
                 'No text available for this section.',
@@ -196,56 +308,162 @@ class _SeforimReaderScreenState extends State<SeforimReaderScreen> {
             );
           }
           return SelectionArea(
-            child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
-            children: [
-              if (p.heRef.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 14, top: 6),
-                  child: Column(
-                    children: [
-                      Text(
-                        p.heRef,
-                        textDirection: TextDirection.rtl,
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.frankRuhlLibre(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.ink,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Container(
-                          width: 40, height: 2, color: SeforimPalette.paperLine),
-                    ],
-                  ),
+            child: CustomScrollView(
+              controller: _controller,
+              center: _centerKey,
+              slivers: [
+                // Sections above the anchor grow upward, so they're listed
+                // nearest-anchor-first; the top status sits above them all.
+                SliverList(
+                  delegate: SliverChildListDelegate([
+                    for (var i = _anchorIndex - 1; i >= 0; i--)
+                      _sectionSlab(_sections[i]),
+                    _topStatus(),
+                  ]),
                 ),
-              ...p.segments.map((seg) {
-                final verseRef = '${p.ref}:${seg.number}';
-                return _SegmentView(
-                  segment: seg,
-                  lang: _lang,
-                  verseRef: verseRef,
-                  selected: _selectedRef == verseRef,
-                  onTap: () => _select(verseRef),
-                  onCopyToReply: () => _copyToReply(p, seg),
-                  onCopyComment: _copyCommentToReply,
-                );
-              }),
-              const SizedBox(height: 20),
-              _NavRow(
-                onPrev: p.prev == null ? null : () => _load(p.prev!),
-                onNext: p.next == null ? null : () => _load(p.next!),
-              ),
-              const SizedBox(height: 20),
-              _Attribution(passage: p),
-            ],
+                // The anchor section and everything below it.
+                SliverList(
+                  key: _centerKey,
+                  delegate: SliverChildListDelegate([
+                    for (var i = _anchorIndex; i < _sections.length; i++)
+                      _sectionSlab(_sections[i]),
+                    _bottomStatus(_sections.last),
+                  ]),
+                ),
+              ],
             ),
           );
         },
       ),
     );
   }
+
+  /// One loaded section: its Hebrew heading followed by its verses.
+  Widget _sectionSlab(SeforimPassage p) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (p.heRef.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 18, bottom: 10),
+              child: Column(
+                children: [
+                  Text(
+                    p.heRef,
+                    textDirection: TextDirection.rtl,
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.frankRuhlLibre(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.ink,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                      width: 40, height: 2, color: SeforimPalette.paperLine),
+                ],
+              ),
+            ),
+          for (final seg in p.segments)
+            _SegmentView(
+              segment: seg,
+              lang: _lang,
+              verseRef: '${p.ref}:${seg.number}',
+              selected: _selectedRef == '${p.ref}:${seg.number}',
+              onTap: () => _select('${p.ref}:${seg.number}'),
+              onCopyToReply: () => _copyToReply(p, seg),
+              onCopyComment: _copyCommentToReply,
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Loading / retry affordance shown above the topmost loaded section.
+  Widget _topStatus() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Column(
+        children: [
+          if (_loadingPrev)
+            _loaderRow()
+          else if (_prependFailed)
+            _retryRow("Couldn't load the previous section", () {
+              setState(() => _prependFailed = false);
+              _prependPrev();
+            }),
+        ],
+      ),
+    );
+  }
+
+  /// Loading / retry / end-of-text and attribution below the last section.
+  Widget _bottomStatus(SeforimPassage last) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 40),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (_loadingNext)
+            _loaderRow()
+          else if (_appendFailed)
+            _retryRow("Couldn't load the next section", () {
+              setState(() => _appendFailed = false);
+              _appendNext();
+            })
+          else if (last.next == null)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              child: Text(
+                last.book.isNotEmpty ? 'End of ${last.book}' : 'End of text',
+                textAlign: TextAlign.center,
+                style: AppText.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.muted,
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ),
+          const SizedBox(height: 16),
+          _Attribution(passage: last),
+        ],
+      ),
+    );
+  }
+
+  Widget _loaderRow() => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 16),
+        child: Center(
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+
+  Widget _retryRow(String message, VoidCallback onRetry) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Column(
+          children: [
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: AppText.inter(fontSize: 12.5, color: AppColors.muted),
+            ),
+            const SizedBox(height: 4),
+            TextButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded, size: 16),
+              label: const Text('Retry'),
+              style: TextButton.styleFrom(foregroundColor: AppColors.indigo),
+            ),
+          ],
+        ),
+      );
 }
 
 /// One verse on the paper page. Flows quietly by default; when [selected] it
@@ -772,50 +990,6 @@ class _SegmentAction extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _NavRow extends StatelessWidget {
-  const _NavRow({required this.onPrev, required this.onNext});
-
-  final VoidCallback? onPrev;
-  final VoidCallback? onNext;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: OutlinedButton.icon(
-            onPressed: onPrev,
-            icon: const Icon(Icons.chevron_left_rounded, size: 20),
-            label: const Text('Previous'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.indigo,
-              side: BorderSide(color: AppColors.line),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: OutlinedButton.icon(
-            onPressed: onNext,
-            icon: const Icon(Icons.chevron_right_rounded, size: 20),
-            label: const Text('Next'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.indigo,
-              side: BorderSide(color: AppColors.line),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }
