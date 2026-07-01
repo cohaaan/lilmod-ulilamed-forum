@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -40,34 +41,100 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
   /// When set, the next reply is posted as a child of this post.
   Post? _replyingTo;
 
+  /// Per-reply keys so tapping "Replying to …" can scroll to the parent, and
+  /// the id of the reply currently flashed after such a jump.
+  final Map<String, GlobalKey> _postKeys = {};
+  String? _highlightedPostId;
+
+  GlobalKey _keyFor(String postId) =>
+      _postKeys.putIfAbsent(postId, () => GlobalKey());
+
+  /// Scrolls to the parent reply and briefly highlights it, so a reader can
+  /// confirm exactly what a reply is answering.
+  void _jumpToParent(String parentId) {
+    final ctx = _postKeys[parentId]?.currentContext;
+    if (ctx != null) {
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+        alignment: 0.15,
+      );
+    }
+    setState(() => _highlightedPostId = parentId);
+    Future.delayed(const Duration(milliseconds: 2600), () {
+      if (mounted && _highlightedPostId == parentId) {
+        setState(() => _highlightedPostId = null);
+      }
+    });
+  }
+
   String? get _uid => authRepository.currentUser?.id;
 
   /// Posts arranged as a tree (each parent immediately followed by its
-  /// descendants), with the nesting depth for indentation.
-  List<({Post post, int depth, String? parentName})> _threadedPosts() {
+  /// descendants), with the nesting depth and per-level connector state used to
+  /// draw the threading lines.
+  ///
+  /// `lanes` has one entry per indentation level (length == depth). For an outer
+  /// lane it says whether that ancestor's vertical line should keep running past
+  /// this row (i.e. the ancestor has a later sibling). The last entry is the
+  /// node's own "elbow" lane and says whether THIS node has a following sibling,
+  /// so the spine continues down to it.
+  List<
+      ({
+        Post post,
+        int depth,
+        String? parentName,
+        List<bool> lanes,
+        bool hasChildren
+      })> _threadedPosts() {
     final byParent = <String?, List<Post>>{};
     final byId = {for (final p in _posts) p.id: p};
     for (final p in _posts) {
       byParent.putIfAbsent(p.parentPostId, () => []).add(p);
     }
-    final result = <({Post post, int depth, String? parentName})>[];
+    final result = <({
+      Post post,
+      int depth,
+      String? parentName,
+      List<bool> lanes,
+      bool hasChildren
+    })>[];
     final seen = <String>{};
-    void walk(String? parentId, int depth) {
-      for (final child in byParent[parentId] ?? const <Post>[]) {
+    void walk(String? parentId, int depth, List<bool> parentLanes) {
+      final children = byParent[parentId] ?? const <Post>[];
+      for (var i = 0; i < children.length; i++) {
+        final child = children[i];
         if (!seen.add(child.id)) continue; // guard against any cycle
+        final hasNext = i < children.length - 1;
+        // Top-level replies aren't connected to each other, so they carry no
+        // lanes; deeper replies inherit their parent's lanes plus their own.
+        final lanes = depth == 0 ? const <bool>[] : [...parentLanes, hasNext];
         final parentName = child.parentPostId == null
             ? null
             : byId[child.parentPostId]?.authorName;
-        result.add((post: child, depth: depth, parentName: parentName));
-        walk(child.id, depth + 1);
+        result.add((
+          post: child,
+          depth: depth,
+          parentName: parentName,
+          lanes: lanes,
+          hasChildren: byParent[child.id]?.isNotEmpty ?? false,
+        ));
+        walk(child.id, depth + 1, lanes);
       }
     }
-    walk(null, 0);
+    walk(null, 0, const <bool>[]);
     // Surface any reply whose parent isn't present (e.g. dangling parent)
     // as a top-level reply rather than dropping it.
     for (final p in _posts) {
       if (seen.add(p.id)) {
-        result.add((post: p, depth: 0, parentName: null));
+        result.add((
+          post: p,
+          depth: 0,
+          parentName: null,
+          lanes: const <bool>[],
+          hasChildren: false,
+        ));
       }
     }
     return result;
@@ -445,11 +512,20 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
                               )
                             else
                               ..._threadedPosts().map((e) => _ReplyTile(
+                                    key: _keyFor(e.post.id),
                                     post: e.post,
                                     depth: e.depth,
+                                    lanes: e.lanes,
+                                    hasChildren: e.hasChildren,
                                     parentName: e.parentName,
+                                    highlighted:
+                                        _highlightedPostId == e.post.id,
                                     isMine: e.post.authorId == _uid,
                                     onReply: () => _startReply(e.post),
+                                    onJumpToParent: e.post.parentPostId == null
+                                        ? null
+                                        : () => _jumpToParent(
+                                            e.post.parentPostId!),
                                     onEdit: () => _editPost(e.post),
                                     onDelete: () => _deletePost(e.post),
                                   )),
@@ -587,29 +663,54 @@ class _ReplyChip extends StatelessWidget {
 
 class _ReplyTile extends StatelessWidget {
   const _ReplyTile({
+    super.key,
     required this.post,
     required this.depth,
+    required this.lanes,
+    required this.hasChildren,
     required this.parentName,
+    required this.highlighted,
     required this.isMine,
     required this.onReply,
+    required this.onJumpToParent,
     required this.onEdit,
     required this.onDelete,
   });
 
   final Post post;
   final int depth;
+
+  /// Per-level connector state (see `_threadedPosts`). Drives the threading
+  /// lines drawn to the left of nested replies.
+  final List<bool> lanes;
+
+  /// Whether this reply has its own replies — draws a descender under the
+  /// avatar so the spine reaches the first child.
+  final bool hasChildren;
   final String? parentName;
+
+  /// Whether this reply is currently flashed (after a jump from a child's
+  /// "Replying to …").
+  final bool highlighted;
   final bool isMine;
   final VoidCallback onReply;
+
+  /// Scrolls to and highlights the reply this one answers; null for top-level
+  /// replies (which answer the main post and have nothing to jump to).
+  final VoidCallback? onJumpToParent;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
+  /// Vertical centre of the 34px avatar within `content` (top padding + radius).
+  /// The connector's elbow hooks into the avatar at this height.
+  static const double _hookY = 12 + 17;
+
   @override
   Widget build(BuildContext context) {
-    // Past two visual levels we stop indenting and keep the relationship as
-    // text ("Replying to …"), so deep, long-form, or Hebrew replies never get
-    // squeezed into a narrow column on small screens.
-    final showParentHeader = depth > 2 && parentName != null;
+    // The connector line shows the parent→child link visually; we also always
+    // name who's being answered so the relationship is unambiguous even after
+    // the list scrolls.
+    final showParentHeader = parentName != null;
 
     final content = Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -623,21 +724,30 @@ class _ReplyTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (showParentHeader) ...[
-                  Row(
-                    children: [
-                      Icon(Icons.subdirectory_arrow_right_rounded,
-                          size: 14, color: AppColors.muted),
-                      const SizedBox(width: 4),
-                      Flexible(
-                        child: Text(
-                          'Replying to $parentName',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppText.caption
-                              .copyWith(fontWeight: FontWeight.w600),
-                        ),
+                  InkWell(
+                    onTap: onJumpToParent,
+                    borderRadius: BorderRadius.circular(6),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 1),
+                      child: Row(
+                        children: [
+                          Icon(Icons.subdirectory_arrow_right_rounded,
+                              size: 14, color: AppColors.indigo),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              'Replying to $parentName',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppText.caption.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.indigo,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                   const SizedBox(height: 4),
                 ],
@@ -717,29 +827,151 @@ class _ReplyTile extends StatelessWidget {
       ),
     );
 
-    if (depth == 0) return content;
+    // Flash a background when this reply is jumped to from a child's
+    // "Replying to …".
+    Widget highlight(Widget child) => AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          decoration: BoxDecoration(
+            color: highlighted
+                ? AppColors.indigo.withValues(alpha: 0.14)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: highlighted
+                  ? AppColors.indigo.withValues(alpha: 0.55)
+                  : Colors.transparent,
+              width: 1.5,
+            ),
+          ),
+          child: child,
+        );
 
-    // Nested replies get a continuous left "rail" per level, capped at two so
-    // indentation can't run away; deeper replies stay at two rails and rely on
-    // the "Replying to …" header above for context.
-    final level = depth.clamp(1, 2);
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+    // A top-level reply with no children needs no connector at all.
+    if (depth == 0 && !hasChildren) return highlight(content);
+
+    // Nested replies get an elbow connector: a vertical spine down each
+    // ancestor lane and a curved hook into this reply's avatar, plus a descender
+    // under the avatar when this reply has its own replies — so the parent→child
+    // link is explicit at any depth. The painter spans the full row (behind the
+    // avatar) so the descender can sit directly under it. A top-level reply that
+    // has children draws only the descender (no incoming elbow).
+    const step = _ThreadConnectorPainter.step;
+    return highlight(IntrinsicHeight(
+      child: Stack(
         children: [
-          for (var i = 0; i < level; i++)
-            Container(
-              width: 22,
-              decoration: BoxDecoration(
-                border:
-                    Border(left: BorderSide(color: AppColors.line, width: 2)),
+          Positioned.fill(
+            child: CustomPaint(
+              painter: _ThreadConnectorPainter(
+                depth: depth,
+                lanes: lanes,
+                hasChildren: hasChildren,
+                color: AppColors.line,
+                hookY: _hookY,
               ),
             ),
-          Expanded(child: content),
+          ),
+          Padding(
+            padding: EdgeInsets.only(left: depth * step),
+            child: content,
+          ),
         ],
       ),
-    );
+    ));
   }
+}
+
+/// Draws the threading lines for a nested reply across the full width of the
+/// row, so a parent's spine can run beneath its avatar down to its first child.
+///
+/// Each indentation level L owns a vertical line at x = L·step + step/2 (just
+/// under that level's avatar). For this reply at `depth` d:
+///  - levels 0..d-2 draw a full-height line when that ancestor has a later
+///    sibling (`lanes[L]`);
+///  - level d-1 (the parent's line) draws from the top to the avatar and curves
+///    in (the elbow), continuing below only when this reply has a next sibling;
+///  - level d (under this reply's own avatar) draws a descender when this reply
+///    has children.
+class _ThreadConnectorPainter extends CustomPainter {
+  const _ThreadConnectorPainter({
+    required this.depth,
+    required this.lanes,
+    required this.hasChildren,
+    required this.color,
+    required this.hookY,
+  });
+
+  final int depth;
+  final List<bool> lanes;
+  final bool hasChildren;
+  final Color color;
+  final double hookY;
+
+  /// Width of one indentation level. A clear step per level (close to an avatar
+  /// width) so the elbows read as a tree, while staying compact enough to nest
+  /// several levels deep on a phone.
+  static const double step = 26;
+
+  /// Radius of the rounded corner where the spine turns into the avatar.
+  static const double _corner = 7;
+
+  /// Avatar radius — the descender to a reply's children leaves from the bottom
+  /// of the avatar (not its centre) so the line clearly originates *from* the
+  /// parent rather than appearing to pass through it.
+  static const double _avatarRadius = 17;
+
+  double _laneX(int level) => level * step + step / 2;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    // Pass-through ancestor lines (levels above the immediate parent).
+    for (var level = 0; level < depth - 1; level++) {
+      if (lanes[level]) {
+        final x = _laneX(level);
+        canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
+      }
+    }
+
+    // The elbow from the parent's line into this reply's avatar (nested only;
+    // top-level replies have no incoming connector).
+    if (depth >= 1) {
+      final parentX = _laneX(depth - 1);
+      final avatarLeft = depth * step;
+      final elbow = Path()
+        ..moveTo(parentX, 0)
+        ..lineTo(parentX, hookY - _corner)
+        ..quadraticBezierTo(parentX, hookY, parentX + _corner, hookY)
+        ..lineTo(avatarLeft + 4, hookY);
+      canvas.drawPath(elbow, paint);
+
+      // Parent's line continues down to this reply's next sibling.
+      if (lanes.isNotEmpty && lanes.last) {
+        canvas.drawLine(
+            Offset(parentX, hookY), Offset(parentX, size.height), paint);
+      }
+    }
+
+    // Descender from the bottom of this reply's avatar down to its own first
+    // child, so the line visibly grows out of the parent.
+    if (hasChildren) {
+      final x = _laneX(depth);
+      canvas.drawLine(
+          Offset(x, hookY + _avatarRadius), Offset(x, size.height), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ThreadConnectorPainter old) =>
+      old.depth != depth ||
+      old.hasChildren != hasChildren ||
+      old.color != color ||
+      old.hookY != hookY ||
+      !listEquals(old.lanes, lanes);
 }
 
 class _ReplyBar extends StatelessWidget {
