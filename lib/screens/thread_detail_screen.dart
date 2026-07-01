@@ -45,8 +45,9 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
   final Map<String, GlobalKey> _postKeys = {};
   String? _highlightedPostId;
 
-  /// Depth-1 replies whose depth-2+ descendants are visible (keyed by post id).
-  final Set<String> _expandedNested = {};
+  /// Replies whose descendant subtree is hidden (keyed by post id). Threads are
+  /// expanded by default; collapsing hides everything below that reply.
+  final Set<String> _collapsed = {};
 
   GlobalKey _keyFor(String postId) =>
       _postKeys.putIfAbsent(postId, () => GlobalKey());
@@ -64,98 +65,80 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
     return null;
   }
 
-  /// The depth-1 ancestor of [postId] — the direct child of a top-level reply
-  /// whose nested subtree owns the collapse toggle.
-  String? _nestedCollapseRoot(String postId) {
-    var cur = _postById(postId);
-    while (cur != null) {
-      final parentId = cur.parentPostId;
-      if (parentId == null) return null;
-      final parent = _postById(parentId);
-      if (parent == null) return null;
-      if (parent.parentPostId == null) return cur.id;
-      cur = parent;
-    }
-    return null;
-  }
-
-  void _collectDescendants(String postId, List<Post> out) {
+  int _descendantCount(String postId) {
+    var n = 0;
     for (final child in _childrenOf(postId)) {
-      out.add(child);
-      _collectDescendants(child.id, out);
+      n += 1 + _descendantCount(child.id);
     }
+    return n;
   }
 
-  void _markDescendantIds(String postId, Set<String> out) {
-    for (final child in _childrenOf(postId)) {
-      out.add(child.id);
-      _markDescendantIds(child.id, out);
-    }
-  }
-
+  /// A one-line preview of the reply being answered, for the "Replying to …"
+  /// chip. Source URLs collapse to a short label so the chip stays readable.
   String _replySnippet(Post parent) {
-    final text = parent.body.trim();
-    if (text.isEmpty) return parent.authorName;
-    final oneLine = text.replaceAll('\n', ' ');
-    if (oneLine.length <= 48) return oneLine;
-    return '${oneLine.substring(0, 48)}…';
+    final text = parent.body
+        .replaceAll(
+          RegExp(r'https?://(?:www\.)?sefaria\.org/\S+', caseSensitive: false),
+          'מקור',
+        )
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    if (text.isEmpty) return '';
+    if (text.length <= 42) return text;
+    return '${text.substring(0, 42)}…';
   }
 
+  /// Flattens the reply tree into a single reading-order column. Each reply
+  /// carries its own `Replying to <author>` chip, so context travels with the
+  /// reply instead of relying on deep indentation. A collapsed reply hides its
+  /// whole subtree.
   List<Widget> _replyWidgets() {
     final widgets = <Widget>[];
     final placed = <String>{};
 
-    void addTopLevel(Post top) {
-      if (!placed.add(top.id)) return;
+    void walk(Post post, int depth) {
+      if (!placed.add(post.id)) return;
+      final parent = post.parentPostId == null
+          ? null
+          : _postById(post.parentPostId!);
+      final childCount = _descendantCount(post.id);
+      final collapsed = _collapsed.contains(post.id);
       widgets.add(
-        _TopLevelReply(
-          key: _keyFor(top.id),
-          post: top,
-          highlighted: _highlightedPostId == top.id,
-          isMine: top.authorId == _uid,
-          onReply: () => _startReply(top),
-          onEdit: () => _editPost(top),
-          onDelete: () => _deletePost(top),
+        _FlatReply(
+          key: _keyFor(post.id),
+          post: post,
+          parentName: parent?.authorName,
+          parentSnippet: parent == null ? null : _replySnippet(parent),
+          depth: depth,
+          highlighted: _highlightedPostId == post.id,
+          isMine: post.authorId == _uid,
+          descendantCount: childCount,
+          collapsed: collapsed,
+          onToggleCollapse: childCount == 0
+              ? null
+              : () => setState(() {
+                    if (!_collapsed.remove(post.id)) _collapsed.add(post.id);
+                  }),
+          onReply: () => _startReply(post),
+          onJumpToParent:
+              parent == null ? null : () => _jumpToParent(parent.id),
+          onEdit: () => _editPost(post),
+          onDelete: () => _deletePost(post),
         ),
       );
-      final direct = _childrenOf(top.id);
-      for (final d in direct) {
-        placed.add(d.id);
-        _markDescendantIds(d.id, placed);
-      }
-      if (direct.isNotEmpty) {
-        widgets.add(
-          _ReplyGroup(
-            topLevel: top,
-            directReplies: direct,
-            expandedNested: _expandedNested,
-            highlightedPostId: _highlightedPostId,
-            uid: _uid,
-            keyFor: _keyFor,
-            snippetFor: _replySnippet,
-            descendantsOf: (id) {
-              final out = <Post>[];
-              _collectDescendants(id, out);
-              return out;
-            },
-            parentOf: _postById,
-            onToggleNested: (id) => setState(() {
-              if (!_expandedNested.remove(id)) _expandedNested.add(id);
-            }),
-            onReply: _startReply,
-            onJumpToParent: _jumpToParent,
-            onEdit: _editPost,
-            onDelete: _deletePost,
-          ),
-        );
+      if (!collapsed) {
+        for (final child in _childrenOf(post.id)) {
+          walk(child, depth + 1);
+        }
       }
     }
 
     for (final top in _childrenOf(null)) {
-      addTopLevel(top);
+      walk(top, 0);
     }
+    // Any orphaned replies (parent no longer loaded) still get shown.
     for (final p in _posts) {
-      if (!placed.contains(p.id)) addTopLevel(p);
+      if (!placed.contains(p.id)) walk(p, 0);
     }
     return widgets;
   }
@@ -317,9 +300,15 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
         FocusScope.of(context).unfocus();
       }
       await _load();
+      // Make sure the new reply is visible: un-collapse its whole ancestry.
       if (parentId != null && mounted) {
-        final root = _nestedCollapseRoot(parentId);
-        if (root != null) setState(() => _expandedNested.add(root));
+        setState(() {
+          var cur = _postById(parentId);
+          while (cur != null) {
+            _collapsed.remove(cur.id);
+            cur = cur.parentPostId == null ? null : _postById(cur.parentPostId!);
+          }
+        });
       }
       // Scroll to the newest reply.
       await Future.delayed(const Duration(milliseconds: 100));
@@ -702,354 +691,131 @@ class _ReplyChip extends StatelessWidget {
   }
 }
 
-class _TopLevelReply extends StatelessWidget {
-  const _TopLevelReply({
+class _FlatReply extends StatelessWidget {
+  const _FlatReply({
     super.key,
     required this.post,
+    this.parentName,
+    this.parentSnippet,
+    required this.depth,
     required this.highlighted,
     required this.isMine,
+    required this.descendantCount,
+    required this.collapsed,
+    this.onToggleCollapse,
     required this.onReply,
+    this.onJumpToParent,
     required this.onEdit,
     required this.onDelete,
   });
 
   final Post post;
+  final String? parentName;
+  final String? parentSnippet;
+  final int depth;
   final bool highlighted;
   final bool isMine;
-  final VoidCallback onReply;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
-
-  @override
-  Widget build(BuildContext context) {
-    return _ReplyHighlight(
-      highlighted: highlighted,
-      child: _CommentRow(
-        post: post,
-        avatarSize: 34,
-        isMine: isMine,
-        onReply: onReply,
-        onEdit: onEdit,
-        onDelete: onDelete,
-      ),
-    );
-  }
-}
-
-class _ReplyGroup extends StatelessWidget {
-  const _ReplyGroup({
-    required this.topLevel,
-    required this.directReplies,
-    required this.expandedNested,
-    required this.highlightedPostId,
-    required this.uid,
-    required this.keyFor,
-    required this.snippetFor,
-    required this.descendantsOf,
-    required this.parentOf,
-    required this.onToggleNested,
-    required this.onReply,
-    required this.onJumpToParent,
-    required this.onEdit,
-    required this.onDelete,
-  });
-
-  final Post topLevel;
-  final List<Post> directReplies;
-  final Set<String> expandedNested;
-  final String? highlightedPostId;
-  final String? uid;
-  final GlobalKey Function(String) keyFor;
-  final String Function(Post) snippetFor;
-  final List<Post> Function(String) descendantsOf;
-  final Post? Function(String) parentOf;
-  final ValueChanged<String> onToggleNested;
-  final void Function(Post) onReply;
-  final void Function(String) onJumpToParent;
-  final void Function(Post) onEdit;
-  final void Function(Post) onDelete;
-
-  static const _indent = 46.0;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(left: _indent, top: 12, bottom: 22),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          border: Border.all(color: AppColors.line),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 13, 14, 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (var i = 0; i < directReplies.length; i++) ...[
-                if (i > 0) ...[
-                  const SizedBox(height: 14),
-                  Divider(height: 1, color: AppColors.line),
-                  const SizedBox(height: 14),
-                ],
-                _DirectReplySection(
-                  post: directReplies[i],
-                  parent: topLevel,
-                  highlighted: highlightedPostId == directReplies[i].id,
-                  isMine: directReplies[i].authorId == uid,
-                  keyFor: keyFor,
-                  snippetFor: snippetFor,
-                  descendants: descendantsOf(directReplies[i].id),
-                  parentOf: parentOf,
-                  nestedExpanded: expandedNested.contains(directReplies[i].id),
-                  highlightedPostId: highlightedPostId,
-                  uid: uid,
-                  onToggleNested: () => onToggleNested(directReplies[i].id),
-                  onReply: onReply,
-                  onJumpToParent: onJumpToParent,
-                  onEdit: onEdit,
-                  onDelete: onDelete,
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _DirectReplySection extends StatelessWidget {
-  const _DirectReplySection({
-    required this.post,
-    required this.parent,
-    required this.highlighted,
-    required this.isMine,
-    required this.keyFor,
-    required this.snippetFor,
-    required this.descendants,
-    required this.parentOf,
-    required this.nestedExpanded,
-    required this.highlightedPostId,
-    required this.uid,
-    required this.onToggleNested,
-    required this.onReply,
-    required this.onJumpToParent,
-    required this.onEdit,
-    required this.onDelete,
-  });
-
-  final Post post;
-  final Post parent;
-  final bool highlighted;
-  final bool isMine;
-  final GlobalKey Function(String) keyFor;
-  final String Function(Post) snippetFor;
-  final List<Post> descendants;
-  final Post? Function(String) parentOf;
-  final bool nestedExpanded;
-  final String? highlightedPostId;
-  final String? uid;
-  final VoidCallback onToggleNested;
-  final void Function(Post) onReply;
-  final void Function(String) onJumpToParent;
-  final void Function(Post) onEdit;
-  final void Function(Post) onDelete;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _ReplyingToHeader(
-          snippet: snippetFor(parent),
-          onTap: () => onJumpToParent(parent.id),
-        ),
-        const SizedBox(height: 8),
-        _ReplyHighlight(
-          highlighted: highlighted,
-          child: _CommentRow(
-            key: keyFor(post.id),
-            post: post,
-            avatarSize: 34,
-            isMine: isMine,
-            onReply: () => onReply(post),
-            onEdit: () => onEdit(post),
-            onDelete: () => onDelete(post),
-          ),
-        ),
-        if (descendants.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          _NestedToggle(
-            count: descendants.length,
-            expanded: nestedExpanded,
-            onTap: onToggleNested,
-          ),
-          AnimatedCrossFade(
-            firstChild: const SizedBox.shrink(),
-            secondChild: _NestedWrap(
-              posts: descendants,
-              parentOf: parentOf,
-              snippetFor: snippetFor,
-              highlightedPostId: highlightedPostId,
-              uid: uid,
-              keyFor: keyFor,
-              onReply: onReply,
-              onJumpToParent: onJumpToParent,
-              onEdit: onEdit,
-              onDelete: onDelete,
-            ),
-            crossFadeState: nestedExpanded
-                ? CrossFadeState.showSecond
-                : CrossFadeState.showFirst,
-            duration: const Duration(milliseconds: 180),
-            sizeCurve: Curves.easeOut,
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-class _NestedWrap extends StatelessWidget {
-  const _NestedWrap({
-    required this.posts,
-    required this.parentOf,
-    required this.snippetFor,
-    required this.highlightedPostId,
-    required this.uid,
-    required this.keyFor,
-    required this.onReply,
-    required this.onJumpToParent,
-    required this.onEdit,
-    required this.onDelete,
-  });
-
-  final List<Post> posts;
-  final Post? Function(String) parentOf;
-  final String Function(Post) snippetFor;
-  final String? highlightedPostId;
-  final String? uid;
-  final GlobalKey Function(String) keyFor;
-  final void Function(Post) onReply;
-  final void Function(String) onJumpToParent;
-  final void Function(Post) onEdit;
-  final void Function(Post) onDelete;
-
-  static const _indent = 46.0;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(left: _indent, top: 12),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          border: Border(
-            left: BorderSide(color: AppColors.line, width: 1),
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.only(left: 14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (final post in posts)
-                _NestedComment(
-                  key: keyFor(post.id),
-                  post: post,
-                  parent: parentOf(post.parentPostId ?? ''),
-                  snippetFor: snippetFor,
-                  highlighted: highlightedPostId == post.id,
-                  isMine: post.authorId == uid,
-                  onReply: () => onReply(post),
-                  onJumpToParent: post.parentPostId == null
-                      ? null
-                      : () => onJumpToParent(post.parentPostId!),
-                  onEdit: () => onEdit(post),
-                  onDelete: () => onDelete(post),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _NestedComment extends StatelessWidget {
-  const _NestedComment({
-    super.key,
-    required this.post,
-    required this.parent,
-    required this.snippetFor,
-    required this.highlighted,
-    required this.isMine,
-    required this.onReply,
-    required this.onJumpToParent,
-    required this.onEdit,
-    required this.onDelete,
-  });
-
-  final Post post;
-  final Post? parent;
-  final String Function(Post) snippetFor;
-  final bool highlighted;
-  final bool isMine;
+  final int descendantCount;
+  final bool collapsed;
+  final VoidCallback? onToggleCollapse;
   final VoidCallback onReply;
   final VoidCallback? onJumpToParent;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
+  static const _depthIndent = 14.0;
+  static const _maxDepthIndent = 56.0;
+
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 8, bottom: 12),
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Positioned(
-            left: -15,
-            top: 22,
-            child: SizedBox(
-              width: 14,
-              height: 1,
-              child: ColoredBox(color: AppColors.line),
+    final leftPad = (depth * _depthIndent).clamp(0.0, _maxDepthIndent);
+    final avatarSize = depth == 0 ? 34.0 : (depth == 1 ? 30.0 : 26.0);
+
+    final column = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (parentName != null && onJumpToParent != null) ...[
+          Align(
+            alignment: Alignment.centerLeft,
+            child: _ReplyingToHeader(
+              authorName: parentName!,
+              snippet: parentSnippet ?? '',
+              onTap: onJumpToParent!,
+              compact: depth > 1,
             ),
           ),
-          _ReplyHighlight(
-            highlighted: highlighted,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Avatar(name: post.authorName, size: 26),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (parent != null && onJumpToParent != null) ...[
-                        _ReplyingToHeader(
-                          snippet: snippetFor(parent!),
-                          onTap: onJumpToParent!,
-                          compact: true,
-                        ),
-                        const SizedBox(height: 6),
-                      ],
-                      _CommentBody(
-                        post: post,
-                        isMine: isMine,
-                        nameSize: 13,
-                        onReply: onReply,
-                        onEdit: onEdit,
-                        onDelete: onDelete,
+          const SizedBox(height: 6),
+        ],
+        _ReplyHighlight(
+          highlighted: highlighted,
+          child: _CommentRow(
+            post: post,
+            avatarSize: avatarSize,
+            isMine: isMine,
+            onReply: onReply,
+            onEdit: onEdit,
+            onDelete: onDelete,
+          ),
+        ),
+        if (descendantCount > 0 && onToggleCollapse != null) ...[
+          const SizedBox(height: 4),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: InkWell(
+              onTap: onToggleCollapse,
+              borderRadius: BorderRadius.circular(5),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      collapsed ? '▶' : '▼',
+                      style: TextStyle(
+                        fontSize: 9,
+                        color: AppColors.indigo,
+                        fontWeight: FontWeight.w800,
                       ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      collapsed
+                          ? 'Show $descendantCount '
+                              '${descendantCount == 1 ? 'reply' : 'replies'}'
+                          : 'Hide ${descendantCount == 1 ? 'reply' : 'replies'}',
+                      style: AppText.caption.copyWith(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.indigo,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ],
+      ],
+    );
+
+    // Nested replies get a thin left rail so the eye can still see the branch,
+    // but context lives in the "Replying to" chip — so we never indent deeply.
+    if (depth == 0) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 4),
+        child: column,
+      );
+    }
+    return Padding(
+      padding: EdgeInsets.only(left: leftPad, bottom: 4),
+      child: Container(
+        padding: const EdgeInsets.only(left: 12),
+        decoration: BoxDecoration(
+          border: Border(
+            left: BorderSide(color: AppColors.line, width: 2),
+          ),
+        ),
+        child: column,
       ),
     );
   }
@@ -1057,7 +823,6 @@ class _NestedComment extends StatelessWidget {
 
 class _CommentRow extends StatelessWidget {
   const _CommentRow({
-    super.key,
     required this.post,
     required this.avatarSize,
     required this.isMine,
@@ -1172,24 +937,37 @@ class _CommentBody extends StatelessWidget {
   }
 }
 
+/// The `↳ Replying to <author>: <snippet>` chip. The author name is the
+/// primary who-answers-whom signal; the snippet is a secondary preview and is
+/// dropped when the parent has no text (e.g. a source-only reply).
 class _ReplyingToHeader extends StatelessWidget {
   const _ReplyingToHeader({
+    required this.authorName,
     required this.snippet,
     required this.onTap,
     this.compact = false,
   });
 
+  final String authorName;
   final String snippet;
   final VoidCallback onTap;
   final bool compact;
 
   @override
   Widget build(BuildContext context) {
+    final quoteStyle = TextStyle(
+      fontWeight: FontWeight.w600,
+      color: AppColors.body.withValues(alpha: 0.85),
+    );
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(6),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 1),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: AppColors.indigo.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(6),
+        ),
         child: RichText(
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
@@ -1201,13 +979,11 @@ class _ReplyingToHeader extends StatelessWidget {
             ),
             children: [
               const TextSpan(text: '↳ Replying to '),
-              TextSpan(
-                text: '"$snippet"',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.body.withValues(alpha: 0.85),
-                ),
-              ),
+              TextSpan(text: authorName),
+              if (snippet.isNotEmpty) ...[
+                TextSpan(text: ': ', style: quoteStyle),
+                TextSpan(text: '“$snippet”', style: quoteStyle),
+              ],
             ],
           ),
         ),
@@ -1234,89 +1010,6 @@ class _ReplyLinkButton extends StatelessWidget {
             fontSize: 11,
             fontWeight: FontWeight.w700,
             color: const Color(0xFF5D6878),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _NestedToggle extends StatelessWidget {
-  const _NestedToggle({
-    required this.count,
-    required this.expanded,
-    required this.onTap,
-  });
-
-  final int count;
-  final bool expanded;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final brutalist = AppColors.useBrutalistChrome;
-    final label = expanded
-        ? 'Hide nested replies'
-        : 'View $count nested ${count == 1 ? 'reply' : 'replies'}';
-
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Padding(
-        padding: const EdgeInsets.only(left: 46),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(5),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 120),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(5),
-                border: Border.all(
-                  color: brutalist ? AppColors.ink : AppColors.line,
-                  width: brutalist ? 1.5 : 1,
-                ),
-                boxShadow: brutalist
-                    ? [
-                        BoxShadow(
-                          color: AppColors.ink,
-                          offset: Offset(0, expanded ? 1 : 2),
-                        ),
-                      ]
-                    : null,
-              ),
-              transform: brutalist && expanded
-                  ? Matrix4.translationValues(0, 1, 0)
-                  : null,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AnimatedRotation(
-                    turns: expanded ? 0.25 : 0,
-                    duration: const Duration(milliseconds: 180),
-                    child: Text(
-                      '▶',
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: brutalist ? AppColors.ink : AppColors.indigo,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 7),
-                  Text(
-                    label,
-                    style: AppText.caption.copyWith(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: brutalist ? AppColors.ink : AppColors.indigo,
-                    ),
-                  ),
-                ],
-              ),
-            ),
           ),
         ),
       ),

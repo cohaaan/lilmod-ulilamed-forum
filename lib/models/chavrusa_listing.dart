@@ -17,16 +17,15 @@ const chavrusaSubjects = [
   'Rambam',
 ];
 
-/// Sidebar day filters (abbrev → full names matched in availability slots).
-const chavrusaDayFilterOptions = {
-  'Mon': ['Monday', 'Weekdays'],
-  'Tue': ['Tuesday', 'Weekdays'],
-  'Wed': ['Wednesday', 'Weekdays'],
-  'Thu': ['Thursday', 'Weekdays'],
-  'Fri': ['Friday', 'Weekdays'],
-  'Sun': ['Sunday', 'Weekends'],
-  'מוצ"ש': ['מוצאי שבת'],
+const _chavrusaWeekdays = {
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
 };
+
+const _chavrusaWeekends = {'Sunday'};
 
 const chavrusaSessionLengths = [
   '5 min',
@@ -156,19 +155,81 @@ String chavrusaCardNotes(ChavrusaListing listing) {
   return 'Open to discussing pace and learning style.';
 }
 
-bool chavrusaListingMatchesDayFilters(
-  ChavrusaListing listing,
-  Set<String> selectedAbbrevs,
-) {
-  if (selectedAbbrevs.isEmpty) return true;
-  final slots = parseChavrusaAvailability(listing.availability).slots;
-  for (final slot in slots) {
-    final day = slot.day;
-    if (day == null) continue;
-    for (final abbrev in selectedAbbrevs) {
-      final names = chavrusaDayFilterOptions[abbrev];
-      if (names != null && names.contains(day)) return true;
+bool chavrusaDaysOverlap(String filterDay, String slotDay) {
+  if (filterDay == slotDay) return true;
+  if (filterDay == 'Weekdays' &&
+      (_chavrusaWeekdays.contains(slotDay) || slotDay == 'Weekdays')) {
+    return true;
+  }
+  if (filterDay == 'Weekends' &&
+      (_chavrusaWeekends.contains(slotDay) || slotDay == 'Weekends')) {
+    return true;
+  }
+  if (slotDay == 'Weekdays' && _chavrusaWeekdays.contains(filterDay)) {
+    return true;
+  }
+  if (slotDay == 'Weekends' && _chavrusaWeekends.contains(filterDay)) {
+    return true;
+  }
+  return false;
+}
+
+(int startHour, int endHour)? chavrusaParseTimeSlotRange(String timeSlot) {
+  final parts = timeSlot.split('–');
+  if (parts.length != 2) return null;
+  final start = _parseChavrusaHourStart(parts[0].trim());
+  final end = _parseChavrusaHourStart(parts[1].trim());
+  if (start == null || end == null) return null;
+  return (start, end);
+}
+
+bool chavrusaTimeRangesOverlap(int aStart, int aEnd, int bStart, int bEnd) =>
+    aStart < bEnd && aEnd > bStart;
+
+/// Match listings whose availability overlaps the seeker's day and/or hour.
+bool chavrusaListingMatchesAvailabilityQuery(
+  ChavrusaListing listing, {
+  String? day,
+  String? time,
+}) {
+  if (day == null && time == null) return true;
+
+  int? filterStart;
+  int? filterEnd;
+  if (time != null) {
+    final timeRange = chavrusaParseTimeSlotRange(time);
+    if (timeRange != null) {
+      filterStart = timeRange.$1;
+      filterEnd = timeRange.$2;
     }
+  }
+
+  final slots = parseChavrusaAvailability(listing.availability)
+      .slots
+      .where((s) => s.isComplete);
+
+  for (final slot in slots) {
+    final slotDay = slot.day;
+    if (day != null &&
+        slotDay != null &&
+        !chavrusaDaysOverlap(day, slotDay)) {
+      continue;
+    }
+    if (filterStart != null &&
+        filterEnd != null &&
+        slot.time != null) {
+      final slotRange = chavrusaParseTimeSlotRange(slot.time!);
+      if (slotRange == null) continue;
+      if (!chavrusaTimeRangesOverlap(
+        slotRange.$1,
+        slotRange.$2,
+        filterStart,
+        filterEnd,
+      )) {
+        continue;
+      }
+    }
+    return true;
   }
   return false;
 }

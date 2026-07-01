@@ -68,7 +68,7 @@ void main() {
     expect(formatChavrusaAvailability(legacy), legacy);
   });
 
-  test('day filters match weekday groups', () {
+  test('availability query matches day and time window', () {
     final listing = ChavrusaListing.fromMap({
       'id': 'x',
       'user_id': 'u',
@@ -79,7 +79,7 @@ void main() {
       'topic': 'Berachos',
       'learning_details': '',
       'availability':
-          '[{"day":"Monday","time":"12 PM – 1 PM"}]',
+          '[{"day":"Monday","time":"12 PM – 1 PM"},{"day":"Thursday","time":"7 AM – 8 AM"}]',
       'phone': '555',
       'ok_whatsapp': true,
       'ok_text': false,
@@ -89,7 +89,76 @@ void main() {
       'created_at': '2026-06-30T12:00:00.000Z',
       'updated_at': '2026-06-30T12:00:00.000Z',
     });
-    expect(chavrusaListingMatchesDayFilters(listing, {'Mon'}), isTrue);
-    expect(chavrusaListingMatchesDayFilters(listing, {'Fri'}), isFalse);
+
+    expect(
+      chavrusaListingMatchesAvailabilityQuery(listing, day: 'Monday'),
+      isTrue,
+    );
+    expect(
+      chavrusaListingMatchesAvailabilityQuery(listing, day: 'Friday'),
+      isFalse,
+    );
+    expect(
+      chavrusaListingMatchesAvailabilityQuery(
+        listing,
+        day: 'Monday',
+        time: '12 PM – 1 PM',
+      ),
+      isTrue,
+    );
+    expect(
+      chavrusaListingMatchesAvailabilityQuery(
+        listing,
+        day: 'Monday',
+        time: '7 AM – 8 AM',
+      ),
+      isFalse,
+    );
+    expect(
+      chavrusaListingMatchesAvailabilityQuery(
+        listing,
+        day: 'Tuesday',
+        time: '12 PM – 1 PM',
+      ),
+      isFalse,
+    );
+    expect(
+      chavrusaListingMatchesAvailabilityQuery(
+        listing,
+        time: '12 PM – 1 PM',
+      ),
+      isTrue,
+    );
+  });
+
+  test('weekday groups overlap for availability query', () {
+    final listing = ChavrusaListing.fromMap({
+      'id': 'x',
+      'user_id': 'u',
+      'display_name': 'Test',
+      'age': 30,
+      'learning_interests': 'Halacha',
+      'session_length': '30 min',
+      'topic': 'Berachos',
+      'learning_details': '',
+      'availability': '[{"day":"Weekdays","time":"12 PM – 1 PM"}]',
+      'phone': '555',
+      'ok_whatsapp': true,
+      'ok_text': false,
+      'ok_call': false,
+      'preferred_contact': 'whatsapp',
+      'status': 'available',
+      'created_at': '2026-06-30T12:00:00.000Z',
+      'updated_at': '2026-06-30T12:00:00.000Z',
+    });
+
+    expect(
+      chavrusaListingMatchesAvailabilityQuery(listing, day: 'Wednesday'),
+      isTrue,
+    );
+    expect(
+      chavrusaListingMatchesAvailabilityQuery(listing, day: 'Sunday'),
+      isFalse,
+    );
   });
 }

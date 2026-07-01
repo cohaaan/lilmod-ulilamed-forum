@@ -74,8 +74,15 @@ final appRouter = GoRouter(
     }
 
     if (atLogin) return home;
-    if (AppConfig.isChavrusasSite && state.matchedLocation == '/') {
-      return '/chavrusas';
+    // The chavrusas site is sealed to its own routes. The main forum isn't
+    // launched, so any stray forum/seforim URL (typed or deep-linked) bounces
+    // back to the board rather than loading an unlaunched screen.
+    if (AppConfig.isChavrusasSite) {
+      final loc = state.matchedLocation;
+      final allowed = loc == '/login' ||
+          loc == '/account' ||
+          loc.startsWith('/chavrusas');
+      if (!allowed) return '/chavrusas';
     }
     return null;
   },
