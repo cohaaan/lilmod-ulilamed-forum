@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../config/seforim_config.dart';
 import '../../data/repositories.dart';
 import '../../data/seforim_clipboard.dart';
 import '../../models/seforim.dart';
 import '../../theme/app_colors.dart';
+import '../../theme/seforim_palette.dart';
 import '../../widgets/async.dart';
 import '../../theme/app_text.dart';
 
@@ -37,8 +40,10 @@ const _relatedHeLabels = {
   'Jewish Thought': 'מחשבה',
 };
 
-/// Reading view for a section of text. Hebrew (RTL) + English, with prev/next
-/// navigation, tap-to-expand mekoros, and "copy to reply" per segment.
+/// Reading view for a section of text. Hebrew (RTL) + English interleaved on a
+/// paper surface. Tapping a verse selects it — the selection highlights, its
+/// mekoros open, and per-verse actions ("copy to reply") surface for that verse
+/// only, so the rest of the page stays quiet and reads like a page.
 class SeforimReaderScreen extends StatefulWidget {
   const SeforimReaderScreen({super.key, required this.reference});
 
@@ -53,12 +58,23 @@ class _SeforimReaderScreenState extends State<SeforimReaderScreen> {
   late Future<SeforimPassage> _future = seforimRepository.fetchPassage(_ref);
   _ReaderLang _lang = _ReaderLang.both;
 
+  /// Ref of the currently-selected verse (e.g. "Genesis 1:3"), or null.
+  /// Selection lives on the list — not per-card — so exactly one verse is
+  /// active at a time.
+  String? _selectedRef;
+
   void _load(String ref) {
     setState(() {
       _ref = ref;
       _future = seforimRepository.fetchPassage(ref);
+      _selectedRef = null;
     });
   }
+
+  /// Toggle selection of a verse (tapping the active verse deselects it).
+  void _select(String verseRef) => setState(
+        () => _selectedRef = _selectedRef == verseRef ? null : verseRef,
+      );
 
   void _copyToReply(SeforimPassage p, SeforimSegment seg) {
     final threadId = seforimClipboard.addSegmentForReply(
@@ -113,9 +129,10 @@ class _SeforimReaderScreenState extends State<SeforimReaderScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.surface,
+      backgroundColor: SeforimPalette.paper,
       appBar: AppBar(
-        backgroundColor: AppColors.surface,
+        backgroundColor: SeforimPalette.paper,
+        surfaceTintColor: Colors.transparent,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () =>
@@ -180,11 +197,11 @@ class _SeforimReaderScreenState extends State<SeforimReaderScreen> {
           }
           return SelectionArea(
             child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
             children: [
               if (p.heRef.isNotEmpty)
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 18, top: 4),
+                  padding: const EdgeInsets.only(bottom: 14, top: 6),
                   child: Column(
                     children: [
                       Text(
@@ -192,29 +209,35 @@ class _SeforimReaderScreenState extends State<SeforimReaderScreen> {
                         textDirection: TextDirection.rtl,
                         textAlign: TextAlign.center,
                         style: GoogleFonts.frankRuhlLibre(
-                          fontSize: 22,
+                          fontSize: 24,
                           fontWeight: FontWeight.w700,
                           color: AppColors.ink,
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Container(width: 40, height: 2, color: AppColors.line),
+                      const SizedBox(height: 10),
+                      Container(
+                          width: 40, height: 2, color: SeforimPalette.paperLine),
                     ],
                   ),
                 ),
-              ...p.segments.map((seg) => _SegmentCard(
-                    segment: seg,
-                    lang: _lang,
-                    verseRef: '${p.ref}:${seg.number}',
-                    onCopyToReply: () => _copyToReply(p, seg),
-                    onCopyComment: _copyCommentToReply,
-                  )),
-              const SizedBox(height: 16),
+              ...p.segments.map((seg) {
+                final verseRef = '${p.ref}:${seg.number}';
+                return _SegmentView(
+                  segment: seg,
+                  lang: _lang,
+                  verseRef: verseRef,
+                  selected: _selectedRef == verseRef,
+                  onTap: () => _select(verseRef),
+                  onCopyToReply: () => _copyToReply(p, seg),
+                  onCopyComment: _copyCommentToReply,
+                );
+              }),
+              const SizedBox(height: 20),
               _NavRow(
                 onPrev: p.prev == null ? null : () => _load(p.prev!),
                 onNext: p.next == null ? null : () => _load(p.next!),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
               _Attribution(passage: p),
             ],
             ),
@@ -225,11 +248,16 @@ class _SeforimReaderScreenState extends State<SeforimReaderScreen> {
   }
 }
 
-class _SegmentCard extends StatefulWidget {
-  const _SegmentCard({
+/// One verse on the paper page. Flows quietly by default; when [selected] it
+/// highlights, reveals its mekoros, and surfaces the per-verse "copy to reply"
+/// action. Selection state is owned by the reader, not the card.
+class _SegmentView extends StatelessWidget {
+  const _SegmentView({
     required this.segment,
     required this.lang,
     required this.verseRef,
+    required this.selected,
+    required this.onTap,
     required this.onCopyToReply,
     required this.onCopyComment,
   });
@@ -237,111 +265,108 @@ class _SegmentCard extends StatefulWidget {
   final SeforimSegment segment;
   final _ReaderLang lang;
   final String verseRef;
+  final bool selected;
+  final VoidCallback onTap;
   final VoidCallback onCopyToReply;
   final void Function(SeforimComment) onCopyComment;
 
   @override
-  State<_SegmentCard> createState() => _SegmentCardState();
-}
-
-class _SegmentCardState extends State<_SegmentCard> {
-  bool _mekorosOpen = false;
-
-  void _toggleMekoros() => setState(() => _mekorosOpen = !_mekorosOpen);
-
-  @override
   Widget build(BuildContext context) {
-    final showHe =
-        widget.lang != _ReaderLang.english && widget.segment.hasHe;
-    final showEn = widget.lang != _ReaderLang.hebrew && widget.segment.hasEn;
+    final showHe = lang != _ReaderLang.english && segment.hasHe;
+    final showEn = lang != _ReaderLang.hebrew && segment.hasEn;
     if (!showHe && !showEn) return const SizedBox.shrink();
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 4),
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 4),
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: AppColors.line)),
-      ),
+      margin: const EdgeInsets.symmetric(vertical: 2),
+      decoration: selected
+          ? BoxDecoration(
+              color: SeforimPalette.paperSelected,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppColors.indigo.withValues(alpha: 0.22),
+              ),
+            )
+          : null,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Material(
-            color: _mekorosOpen
-                ? AppColors.indigo.withValues(alpha: 0.04)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-            child: InkWell(
-              onTap: _toggleMekoros,
-              borderRadius: BorderRadius.circular(8),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      width: 22,
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 6),
-                        child: Text(
-                          widget.segment.number,
-                          textAlign: TextAlign.center,
-                          style: GoogleFonts.ebGaramond(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.muted,
-                          ),
+          InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 22,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 7),
+                      child: Text(
+                        segment.number,
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.ebGaramond(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: selected ? AppColors.indigo : AppColors.muted,
                         ),
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (showHe)
-                            Text(
-                              widget.segment.he,
-                              textDirection: TextDirection.rtl,
-                              style: GoogleFonts.frankRuhlLibre(
-                                fontSize: 22,
-                                height: 1.9,
-                                color: AppColors.ink,
-                              ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (showHe)
+                          Text(
+                            segment.he,
+                            textDirection: TextDirection.rtl,
+                            style: GoogleFonts.frankRuhlLibre(
+                              fontSize: 23,
+                              height: 2.0,
+                              color: AppColors.ink,
                             ),
-                          if (showHe && showEn) const SizedBox(height: 8),
-                          if (showEn)
-                            Text(
-                              widget.segment.en,
-                              style: GoogleFonts.ebGaramond(
-                                fontSize: 16.5,
-                                height: 1.7,
-                                color: AppColors.body,
-                              ),
+                          ),
+                        if (showHe && showEn) const SizedBox(height: 10),
+                        if (showEn)
+                          Text(
+                            segment.en,
+                            style: GoogleFonts.ebGaramond(
+                              fontSize: 17,
+                              height: 1.75,
+                              color: AppColors.body,
                             ),
-                        ],
-                      ),
+                          ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
-          if (_mekorosOpen)
-            _VerseCommentaries(
-              verseRef: widget.verseRef,
-              lang: widget.lang,
-              onCopyToReply: widget.onCopyComment,
+          if (selected) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
+              child: _VerseCommentaries(
+                verseRef: verseRef,
+                lang: lang,
+                onCopyToReply: onCopyComment,
+              ),
             ),
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerRight,
-            child: _SegmentAction(
-              icon: Icons.reply_rounded,
-              label: 'Copy to reply',
-              primary: true,
-              onTap: widget.onCopyToReply,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 0, 8, 10),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: _SegmentAction(
+                  icon: Icons.reply_rounded,
+                  label: 'Copy to reply',
+                  primary: true,
+                  onTap: onCopyToReply,
+                ),
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -544,8 +569,9 @@ class _CommentatorTileState extends State<_CommentatorTile> {
     return Container(
       margin: const EdgeInsets.only(top: 6),
       decoration: BoxDecoration(
-        color: AppColors.surfaceMuted,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: SeforimPalette.paperLine),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -794,53 +820,129 @@ class _NavRow extends StatelessWidget {
   }
 }
 
+/// Source attribution for the section. Renders each version's title, its
+/// digitization source (`versionSource`) and license, plus a link back to the
+/// passage on Sefaria — both the source credit and the link-back are required
+/// by the project's legal rules (see SEFORIM_PLAN.md).
 class _Attribution extends StatelessWidget {
   const _Attribution({required this.passage});
 
   final SeforimPassage passage;
 
+  static Future<void> _open(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  /// Prettier label for a `versionSource`: its host if it's a URL, else raw.
+  static String _sourceLabel(String source) {
+    final u = Uri.tryParse(source);
+    if (u != null && u.hasScheme && u.host.isNotEmpty) return u.host;
+    return source;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final lines = <String>[];
-    void add(SeforimAttribution? a) {
-      if (a == null) return;
-      final bits = [
-        if (a.versionTitle.isNotEmpty) a.versionTitle,
-        if (a.license.isNotEmpty) a.license,
-      ];
-      if (bits.isNotEmpty) lines.add(bits.join(' · '));
-    }
+    final versions = <SeforimAttribution>[
+      if (passage.heAttribution != null) passage.heAttribution!,
+      if (passage.enAttribution != null) passage.enAttribution!,
+    ].where((a) =>
+        a.versionTitle.isNotEmpty ||
+        a.source.isNotEmpty ||
+        a.license.isNotEmpty).toList();
 
-    add(passage.heAttribution);
-    add(passage.enAttribution);
-    if (lines.isEmpty) return const SizedBox.shrink();
+    final webUrl =
+        passage.ref.isNotEmpty ? SeforimConfig.webUrl(passage.ref) : '';
+    if (versions.isEmpty && webUrl.isEmpty) return const SizedBox.shrink();
 
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.surfaceMuted,
+        border: Border.all(color: SeforimPalette.paperLine),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Source',
+            'SOURCE',
             style: AppText.inter(
-              fontSize: 11,
+              fontSize: 10.5,
               fontWeight: FontWeight.w700,
               color: AppColors.muted,
-              letterSpacing: 0.3,
+              letterSpacing: 0.6,
             ),
           ),
-          const SizedBox(height: 4),
-          for (final l in lines)
-            Text(
-              l,
-              style: AppText.inter(fontSize: 11.5, color: AppColors.muted),
+          for (final a in versions) ...[
+            const SizedBox(height: 6),
+            if (a.versionTitle.isNotEmpty || a.license.isNotEmpty)
+              Text(
+                [
+                  if (a.versionTitle.isNotEmpty) a.versionTitle,
+                  if (a.license.isNotEmpty) a.license,
+                ].join(' · '),
+                style: AppText.inter(fontSize: 11.5, color: AppColors.muted),
+              ),
+            if (a.source.isNotEmpty)
+              _LinkText(
+                label: _sourceLabel(a.source),
+                onTap: Uri.tryParse(a.source)?.hasScheme ?? false
+                    ? () => _open(a.source)
+                    : null,
+              ),
+          ],
+          if (webUrl.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            InkWell(
+              onTap: () => _open(webUrl),
+              borderRadius: BorderRadius.circular(6),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'View this passage on Sefaria',
+                      style: AppText.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.indigo,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(Icons.open_in_new_rounded,
+                        size: 13, color: AppColors.indigo),
+                  ],
+                ),
+              ),
             ),
+          ],
         ],
       ),
     );
+  }
+}
+
+/// A short attribution line that's tappable (a link) when [onTap] is given,
+/// and plain muted text otherwise.
+class _LinkText extends StatelessWidget {
+  const _LinkText({required this.label, this.onTap});
+
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Text(
+      label,
+      style: AppText.inter(
+        fontSize: 11.5,
+        color: onTap != null ? AppColors.indigo : AppColors.muted,
+        decoration: onTap != null ? TextDecoration.underline : null,
+      ),
+    );
+    if (onTap == null) return text;
+    return InkWell(onTap: onTap, child: text);
   }
 }

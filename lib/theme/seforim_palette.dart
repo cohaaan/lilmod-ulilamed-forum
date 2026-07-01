@@ -28,4 +28,17 @@ abstract final class SeforimPalette {
 
   static Color forCategory(String? category) =>
       _byCategory[category] ?? fallback;
+
+  // --- Reader "paper" surfaces -------------------------------------------
+  // A warm off-white page for the text reader, so a section of Chumash/Gemara
+  // reads like a page rather than a stack of cards. Our own values.
+
+  /// The reader page background — a soft cream.
+  static const paper = Color(0xFFFBF8F1);
+
+  /// Background of the currently-selected verse (a touch deeper than [paper]).
+  static const paperSelected = Color(0xFFF1EADA);
+
+  /// Hairline used sparingly on the paper surface.
+  static const paperLine = Color(0xFFE8E1D2);
 }
