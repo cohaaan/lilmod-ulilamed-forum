@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../theme/app_text.dart';
 
 /// A colourful gradient tile used in the horizontal "Popular categories" rail.
 class TopicCard extends StatelessWidget {
@@ -62,7 +62,7 @@ class TopicCard extends StatelessWidget {
                 title,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.inter(
+                style: AppText.inter(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
                   height: 1.2,
@@ -74,7 +74,7 @@ class TopicCard extends StatelessWidget {
                 subtitle,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.inter(
+                style: AppText.inter(
                   fontSize: 12,
                   color: Colors.white.withValues(alpha: 0.85),
                 ),

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../data/articles_data.dart';
 import '../theme/app_colors.dart';
 import '../widgets/article_card.dart';
+import '../theme/app_text.dart';
 
 class ArticlesScreen extends StatelessWidget {
   const ArticlesScreen({super.key});
@@ -18,7 +18,7 @@ class ArticlesScreen extends StatelessWidget {
           children: [
             Text(
               'Articles',
-              style: GoogleFonts.inter(
+              style: AppText.inter(
                 fontSize: 24,
                 fontWeight: FontWeight.w800,
                 color: AppColors.ink,
@@ -28,7 +28,7 @@ class ArticlesScreen extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               'Long-form articles, source studies, and written contributions.',
-              style: GoogleFonts.inter(
+              style: AppText.inter(
                 fontSize: 14,
                 color: AppColors.muted,
                 height: 1.45,

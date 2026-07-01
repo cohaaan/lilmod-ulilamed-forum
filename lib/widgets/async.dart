@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../theme/app_colors.dart';
+import '../theme/app_text.dart';
 
 /// Wraps a [Future] with consistent loading, error (+retry) and data states.
 class AsyncView<T> extends StatelessWidget {
@@ -57,7 +57,8 @@ class _FillHeight extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final height = constraints.maxHeight > minHeight
+        final height = constraints.maxHeight.isFinite &&
+                constraints.maxHeight > minHeight
             ? constraints.maxHeight
             : minHeight;
         return SingleChildScrollView(
@@ -100,7 +101,7 @@ class _ErrorState extends StatelessWidget {
           Text(
             _message,
             textAlign: TextAlign.center,
-            style: GoogleFonts.inter(fontSize: 14, color: AppColors.muted),
+            style: AppText.inter(fontSize: 14, color: AppColors.muted),
           ),
           if (onRetry != null) ...[
             const SizedBox(height: 14),

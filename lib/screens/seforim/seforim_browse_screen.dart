@@ -7,6 +7,7 @@ import '../../models/seforim.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/async.dart';
 import '../../widgets/seforim_rows.dart';
+import '../../theme/app_text.dart';
 
 /// The Seforim tab root: the top level of the library tree, Sefaria-style —
 /// a colour-coded, serif list of corpora with short descriptions.
@@ -59,7 +60,7 @@ class _SeforimBrowseScreenState extends State<SeforimBrowseScreen> {
               const SizedBox(height: 6),
               Text(
                 'Browse the library and copy sources straight into your reply.',
-                style: GoogleFonts.inter(
+                style: AppText.inter(
                   fontSize: 13.5,
                   color: AppColors.muted,
                   height: 1.45,
@@ -80,7 +81,7 @@ class _SeforimBrowseScreenState extends State<SeforimBrowseScreen> {
               Text(
                 'Texts via Sefaria’s open API. Sources are attributed to their '
                 'publishers; most are public domain or Creative Commons.',
-                style: GoogleFonts.inter(
+                style: AppText.inter(
                   fontSize: 11.5,
                   color: AppColors.muted,
                   height: 1.4,

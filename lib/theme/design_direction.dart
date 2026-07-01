@@ -92,43 +92,39 @@ class DesignDirection {
     required Color color,
     required double height,
   }) {
-    switch (typography) {
-      case DesignTypography.inter:
-        return GoogleFonts.inter(
+    final base = switch (typography) {
+      DesignTypography.inter => GoogleFonts.inter(
           fontSize: size,
           fontWeight: weight,
           color: color,
           height: height,
-        );
-      case DesignTypography.serif:
-        return GoogleFonts.sourceSerif4(
+        ),
+      DesignTypography.serif => GoogleFonts.sourceSerif4(
           fontSize: size,
           fontWeight: weight,
           color: color,
           height: height,
-        );
-      case DesignTypography.mono:
-        return GoogleFonts.ibmPlexSans(
+        ),
+      DesignTypography.mono => GoogleFonts.ibmPlexSans(
           fontSize: size,
           fontWeight: weight,
           color: color,
           height: height,
-        );
-      case DesignTypography.lato:
-        return GoogleFonts.lato(
+        ),
+      DesignTypography.lato => GoogleFonts.lato(
           fontSize: size,
           fontWeight: weight,
           color: color,
           height: height,
-        );
-      case DesignTypography.system:
-        return TextStyle(
+        ),
+      DesignTypography.system => TextStyle(
           fontSize: size,
           fontWeight: weight,
           color: color,
           height: height,
-        );
-    }
+        ),
+    };
+    return base.copyWith(fontFamilyFallback: const ['NotoSansHebrew']);
   }
 
   BoxDecoration cardDecoration({Color? color}) {

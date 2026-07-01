@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../data/repositories.dart';
 import '../models/thread.dart';
 import '../theme/app_colors.dart';
 import '../widgets/async.dart';
 import '../widgets/post_card.dart';
+import '../theme/app_text.dart';
 
 class BookmarksScreen extends StatefulWidget {
   const BookmarksScreen({super.key});
@@ -36,7 +36,7 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
         ),
         title: Text(
           'Bookmarks',
-          style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700),
+          style: AppText.inter(fontSize: 16, fontWeight: FontWeight.w700),
         ),
       ),
       body: RefreshIndicator(
@@ -81,7 +81,7 @@ class _EmptyBookmarks extends StatelessWidget {
           child: Text(
             'No bookmarks yet. Tap the bookmark icon on a thread to save it.',
             textAlign: TextAlign.center,
-            style: GoogleFonts.inter(fontSize: 14, color: AppColors.muted),
+            style: AppText.inter(fontSize: 14, color: AppColors.muted),
           ),
         ),
       ],

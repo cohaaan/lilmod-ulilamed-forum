@@ -7,6 +7,7 @@ import '../../models/seforim.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/async.dart';
 import '../../widgets/seforim_rows.dart';
+import '../../theme/app_text.dart';
 
 /// Table of contents for a book: a grid of chapters (or daf for Talmud), or a
 /// list of sub-sections for a complex work. Tapping a section opens the reader.
@@ -140,7 +141,7 @@ class _SeforimBookScreenState extends State<SeforimBookScreen> {
         const SizedBox(height: 6),
         Text(
           node.description,
-          style: GoogleFonts.inter(
+          style: AppText.inter(
             fontSize: 13.5,
             height: 1.45,
             color: AppColors.muted,

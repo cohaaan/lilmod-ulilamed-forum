@@ -9,6 +9,15 @@ import 'design_direction.dart';
 /// Use these instead of ad-hoc font calls so the app has one consistent type
 /// ramp. Font family follows the active [DesignDirection].
 abstract final class AppText {
+  /// Locally-bundled Hebrew face (see `pubspec.yaml` fonts). Applied as a
+  /// `fontFamilyFallback` on every style so Hebrew glyphs resolve from a font
+  /// that's present at first paint — the Latin app fonts (Inter/Lato/…) have no
+  /// Hebrew glyphs, and without a bundled fallback CanvasKit paints `.notdef`
+  /// bars for each Hebrew letter until it fetches a Noto face over the network.
+  static const String hebrewFallback = 'NotoSansHebrew';
+
+  static const List<String> _hebrew = [hebrewFallback];
+
   static DesignTypography _typography = DesignTypography.inter;
 
   static void apply(DesignDirection direction) {
@@ -81,6 +90,28 @@ abstract final class AppText {
         color: AppColors.muted,
       );
 
+  /// Drop-in for `GoogleFonts.inter(...)` that carries the bundled Hebrew
+  /// fallback. Use this anywhere ad-hoc Inter text may contain Hebrew so it
+  /// never flashes `.notdef` bars while a network Noto face loads.
+  static TextStyle inter({
+    double? fontSize,
+    FontWeight? fontWeight,
+    Color? color,
+    double? height,
+    double? letterSpacing,
+    FontStyle? fontStyle,
+    TextDecoration? decoration,
+  }) =>
+      GoogleFonts.inter(
+        fontSize: fontSize,
+        fontWeight: fontWeight,
+        color: color,
+        height: height,
+        letterSpacing: letterSpacing,
+        fontStyle: fontStyle,
+        decoration: decoration,
+      ).copyWith(fontFamilyFallback: _hebrew);
+
   /// Ad-hoc sans text matching the active design direction.
   static TextStyle sans({
     double? fontSize,
@@ -116,7 +147,7 @@ abstract final class AppText {
           height: height,
           letterSpacing: letterSpacing,
           fontStyle: fontStyle,
-        );
+        ).copyWith(fontFamilyFallback: _hebrew);
       case DesignTypography.serif:
         return GoogleFonts.sourceSerif4(
           fontSize: fontSize,
@@ -125,7 +156,7 @@ abstract final class AppText {
           height: height,
           letterSpacing: letterSpacing,
           fontStyle: fontStyle,
-        );
+        ).copyWith(fontFamilyFallback: _hebrew);
       case DesignTypography.mono:
         return GoogleFonts.ibmPlexSans(
           fontSize: fontSize,
@@ -134,7 +165,7 @@ abstract final class AppText {
           height: height,
           letterSpacing: letterSpacing,
           fontStyle: fontStyle,
-        );
+        ).copyWith(fontFamilyFallback: _hebrew);
       case DesignTypography.system:
         return TextStyle(
           fontSize: fontSize,
@@ -143,6 +174,7 @@ abstract final class AppText {
           height: height,
           letterSpacing: letterSpacing,
           fontStyle: fontStyle,
+          fontFamilyFallback: _hebrew,
         );
       case DesignTypography.inter:
         return GoogleFonts.inter(
@@ -152,7 +184,7 @@ abstract final class AppText {
           height: height,
           letterSpacing: letterSpacing,
           fontStyle: fontStyle,
-        );
+        ).copyWith(fontFamilyFallback: _hebrew);
     }
   }
 }

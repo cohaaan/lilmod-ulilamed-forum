@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../data/repositories.dart';
 import '../models/profile.dart';
 import '../theme/app_colors.dart';
 import '../widgets/avatar.dart';
+import '../theme/app_text.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -72,7 +72,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       appBar: AppBar(
         title: Text(
           'Edit profile',
-          style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700),
+          style: AppText.inter(fontSize: 16, fontWeight: FontWeight.w700),
         ),
         actions: [
           Padding(
@@ -119,7 +119,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     const SizedBox(height: 12),
                     Text(
                       _error!,
-                      style: GoogleFonts.inter(
+                      style: AppText.inter(
                         color: AppColors.like,
                         fontSize: 13,
                       ),

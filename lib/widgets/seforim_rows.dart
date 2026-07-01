@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/seforim.dart';
 import '../theme/app_colors.dart';
 import '../theme/seforim_palette.dart';
+import '../theme/app_text.dart';
 
 /// A Sefaria-style library row: a thin category-colour rule on top, the
 /// work/category name in a serif face with its Hebrew name alongside, and a
@@ -68,7 +69,7 @@ Widget seforimNodeRow(
                   const SizedBox(height: 6),
                   Text(
                     node.description,
-                    style: GoogleFonts.inter(
+                    style: AppText.inter(
                       fontSize: 13.5,
                       height: 1.45,
                       color: AppColors.muted,

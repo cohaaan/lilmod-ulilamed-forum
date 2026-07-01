@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lilmod_ulilamed/models/post.dart';
 import 'package:lilmod_ulilamed/models/thread.dart';
+import 'package:lilmod_ulilamed/theme/forum_palette.dart';
 import 'package:lilmod_ulilamed/util/format.dart';
 
 void main() {
@@ -82,6 +83,21 @@ void main() {
 
     test('accentForId is deterministic', () {
       expect(accentForId('gemara'), accentForId('gemara'));
+    });
+
+    test('ForumPalette assigns distinct topic colours', () {
+      expect(
+        ForumPalette.forSubforum('gemara'),
+        ForumPalette.forSubforum('gemara'),
+      );
+      expect(
+        ForumPalette.forSubforum('finding-sources'),
+        isNot(ForumPalette.forSubforum('gemara')),
+      );
+      expect(
+        ForumPalette.forSubforum('aggadah-midrash'),
+        ForumPalette.forName('Aggadah and Derush'),
+      );
     });
   });
 }

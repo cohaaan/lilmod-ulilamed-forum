@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../theme/app_colors.dart';
+import '../theme/forum_palette.dart';
 
 /// A short relative time like "3h ago" / "2d ago".
 String relativeTime(DateTime time) {
@@ -26,12 +26,6 @@ String relativeTime(DateTime time) {
   return '$mo month${mo == 1 ? '' : 's'} ago';
 }
 
-/// A stable accent colour derived from any id/slug string.
-Color accentForId(String id) {
-  if (id.isEmpty) return AppColors.accents.first;
-  var hash = 0;
-  for (final unit in id.codeUnits) {
-    hash = (hash + unit) % AppColors.accents.length;
-  }
-  return AppColors.accents[hash];
-}
+/// A stable accent colour for a forum category/subforum id, or a hash fallback.
+Color accentForId(String id) =>
+    ForumPalette.tryForId(id) ?? ForumPalette.forSubforum(id);

@@ -7,6 +7,7 @@ import '../../data/seforim_clipboard.dart';
 import '../../models/seforim.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/async.dart';
+import '../../theme/app_text.dart';
 
 enum _ReaderLang { both, hebrew, english }
 
@@ -149,7 +150,7 @@ class _SeforimReaderScreenState extends State<SeforimReaderScreen> {
             return Center(
               child: Text(
                 'No text available for this section.',
-                style: GoogleFonts.inter(fontSize: 14, color: AppColors.muted),
+                style: AppText.inter(fontSize: 14, color: AppColors.muted),
               ),
             );
           }
@@ -168,7 +169,7 @@ class _SeforimReaderScreenState extends State<SeforimReaderScreen> {
                   'No $lang text available for this section.\n'
                   'Try switching language from the menu above.',
                   textAlign: TextAlign.center,
-                  style: GoogleFonts.inter(
+                  style: AppText.inter(
                     fontSize: 14,
                     height: 1.5,
                     color: AppColors.muted,
@@ -396,7 +397,7 @@ class _VerseCommentariesState extends State<_VerseCommentaries> {
             child: Text(
               'Could not load mekoros.',
               style:
-                  GoogleFonts.inter(fontSize: 12.5, color: AppColors.muted),
+                  AppText.inter(fontSize: 12.5, color: AppColors.muted),
             ),
           );
         }
@@ -407,7 +408,7 @@ class _VerseCommentariesState extends State<_VerseCommentaries> {
             child: Text(
               'No mekoros on this verse.',
               style:
-                  GoogleFonts.inter(fontSize: 12.5, color: AppColors.muted),
+                  AppText.inter(fontSize: 12.5, color: AppColors.muted),
             ),
           );
         }
@@ -490,7 +491,7 @@ class _RelatedCategory extends StatelessWidget {
               const SizedBox(width: 6),
               Text(
                 '${category.toUpperCase()} · ${order.length}',
-                style: GoogleFonts.inter(
+                style: AppText.inter(
                   fontSize: 10.5,
                   fontWeight: FontWeight.w700,
                   color: AppColors.muted,
@@ -642,7 +643,7 @@ class _LazyCommentTextState extends State<_LazyCommentText> {
             child: Text(
               'Could not load this source.',
               style:
-                  GoogleFonts.inter(fontSize: 12.5, color: AppColors.muted),
+                  AppText.inter(fontSize: 12.5, color: AppColors.muted),
             ),
           );
         }
@@ -668,7 +669,7 @@ class _LazyCommentTextState extends State<_LazyCommentText> {
             if (showEn)
               Text(
                 en,
-                style: GoogleFonts.inter(
+                style: AppText.inter(
                   fontSize: 13.5,
                   height: 1.55,
                   color: AppColors.body,
@@ -735,7 +736,7 @@ class _SegmentAction extends StatelessWidget {
               const SizedBox(width: 5),
               Text(
                 label,
-                style: GoogleFonts.inter(
+                style: AppText.inter(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                   color: color,
@@ -825,7 +826,7 @@ class _Attribution extends StatelessWidget {
         children: [
           Text(
             'Source',
-            style: GoogleFonts.inter(
+            style: AppText.inter(
               fontSize: 11,
               fontWeight: FontWeight.w700,
               color: AppColors.muted,
@@ -836,7 +837,7 @@ class _Attribution extends StatelessWidget {
           for (final l in lines)
             Text(
               l,
-              style: GoogleFonts.inter(fontSize: 11.5, color: AppColors.muted),
+              style: AppText.inter(fontSize: 11.5, color: AppColors.muted),
             ),
         ],
       ),

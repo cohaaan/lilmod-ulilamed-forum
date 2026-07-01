@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../data/articles_data.dart';
 import '../theme/app_colors.dart';
 import '../widgets/soft_card.dart';
+import '../theme/app_text.dart';
 
 class ArticleDetailScreen extends StatelessWidget {
   const ArticleDetailScreen({super.key, required this.slug});
@@ -24,7 +24,7 @@ class ArticleDetailScreen extends StatelessWidget {
         ),
         title: Text(
           'Article',
-          style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700),
+          style: AppText.inter(fontSize: 16, fontWeight: FontWeight.w700),
         ),
         actions: [
           IconButton(
@@ -42,7 +42,7 @@ class ArticleDetailScreen extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 article.date,
-                style: GoogleFonts.inter(
+                style: AppText.inter(
                   fontSize: 12.5,
                   color: AppColors.muted,
                 ),
@@ -52,7 +52,7 @@ class ArticleDetailScreen extends StatelessWidget {
           const SizedBox(height: 14),
           Text(
             article.title,
-            style: GoogleFonts.inter(
+            style: AppText.inter(
               fontSize: 24,
               fontWeight: FontWeight.w800,
               height: 1.25,
@@ -64,7 +64,7 @@ class ArticleDetailScreen extends StatelessWidget {
             const SizedBox(height: 12),
             Text(
               article.excerpt!,
-              style: GoogleFonts.inter(
+              style: AppText.inter(
                 fontSize: 15,
                 height: 1.6,
                 color: AppColors.body,
@@ -75,7 +75,7 @@ class ArticleDetailScreen extends StatelessWidget {
           SoftCard(
             child: Text(
               'The article body will load here once the backend is connected.',
-              style: GoogleFonts.inter(
+              style: AppText.inter(
                 fontSize: 14.5,
                 height: 1.7,
                 color: AppColors.body,

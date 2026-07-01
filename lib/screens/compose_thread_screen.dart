@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../data/repositories.dart';
 import '../theme/app_colors.dart';
+import '../theme/app_text.dart';
 
 class ComposeThreadScreen extends StatefulWidget {
   const ComposeThreadScreen({
@@ -65,7 +65,7 @@ class _ComposeThreadScreenState extends State<ComposeThreadScreen> {
       appBar: AppBar(
         title: Text(
           'New thread',
-          style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700),
+          style: AppText.inter(fontSize: 16, fontWeight: FontWeight.w700),
         ),
         actions: [
           Padding(
@@ -90,7 +90,7 @@ class _ComposeThreadScreenState extends State<ComposeThreadScreen> {
           children: [
             Text(
               'Posting in ${widget.subforumName}',
-              style: GoogleFonts.inter(fontSize: 13, color: AppColors.muted),
+              style: AppText.inter(fontSize: 13, color: AppColors.muted),
             ),
             const SizedBox(height: 16),
             Wrap(
@@ -103,7 +103,7 @@ class _ComposeThreadScreenState extends State<ComposeThreadScreen> {
                   onSelected: (_) => setState(() => _type = t),
                   showCheckmark: false,
                   selectedColor: AppColors.indigo.withValues(alpha: 0.12),
-                  labelStyle: GoogleFonts.inter(
+                  labelStyle: AppText.inter(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: selected ? AppColors.indigo : AppColors.body,
@@ -143,7 +143,7 @@ class _ComposeThreadScreenState extends State<ComposeThreadScreen> {
               const SizedBox(height: 12),
               Text(
                 _error!,
-                style: GoogleFonts.inter(color: AppColors.like, fontSize: 13),
+                style: AppText.inter(color: AppColors.like, fontSize: 13),
               ),
             ],
           ],

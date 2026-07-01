@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../theme/app_text.dart';
 
 /// A circular avatar that derives a stable colour and initial from a name.
 /// Works for both Latin and Hebrew names (uses the first character).
@@ -48,7 +48,7 @@ class Avatar extends StatelessWidget {
       ),
       child: Text(
         _initial,
-        style: GoogleFonts.inter(
+        style: AppText.inter(
           fontSize: size * 0.42,
           fontWeight: FontWeight.w700,
           color: color,

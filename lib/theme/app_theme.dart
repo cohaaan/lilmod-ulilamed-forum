@@ -14,7 +14,10 @@ abstract final class AppTheme {
     AppText.apply(direction);
 
     final sans = _textTheme(direction);
-    final hebrewFamily = GoogleFonts.notoSansHebrew().fontFamily;
+    // Bundled locally (see pubspec + AppText.hebrewFallback) — do NOT use
+    // GoogleFonts.notoSansHebrew() here: that fetches over the network, which is
+    // exactly what makes Hebrew flash as `.notdef` bars on first load.
+    const hebrewFamily = AppText.hebrewFallback;
     final isSlack = direction.id == DesignDirections.slackWorkspace.id;
     final isBrutalist = direction.useBrutalistChrome;
     final radius = direction.cornerRadius;
@@ -64,7 +67,7 @@ abstract final class AppTheme {
           .apply(
             bodyColor: AppColors.body,
             displayColor: AppColors.ink,
-            fontFamilyFallback: [if (hebrewFamily != null) hebrewFamily],
+            fontFamilyFallback: const [hebrewFamily],
           ),
       dividerColor: AppColors.line,
       appBarTheme: AppBarTheme(

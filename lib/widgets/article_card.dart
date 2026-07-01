@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../models/article_item.dart';
 import '../theme/app_colors.dart';
 import 'soft_card.dart';
+import '../theme/app_text.dart';
 
 class ArticleCard extends StatelessWidget {
   const ArticleCard({super.key, required this.article});
@@ -33,7 +33,7 @@ class ArticleCard extends StatelessWidget {
                   article.date,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.inter(
+                  style: AppText.inter(
                     fontSize: 12,
                     color: AppColors.muted,
                   ),
@@ -43,7 +43,7 @@ class ArticleCard extends StatelessWidget {
             const SizedBox(height: 10),
             Text(
               article.title,
-              style: GoogleFonts.inter(
+              style: AppText.inter(
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
                 height: 1.3,
@@ -54,7 +54,7 @@ class ArticleCard extends StatelessWidget {
               const SizedBox(height: 6),
               Text(
                 article.excerpt!,
-                style: GoogleFonts.inter(
+                style: AppText.inter(
                   fontSize: 13.5,
                   height: 1.5,
                   color: AppColors.muted,

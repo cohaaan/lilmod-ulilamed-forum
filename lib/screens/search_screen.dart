@@ -1,13 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../data/repositories.dart';
 import '../models/thread.dart';
 import '../theme/app_colors.dart';
 import '../util/format.dart';
 import '../widgets/post_card.dart';
+import '../theme/app_text.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -54,7 +54,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 children: [
                   Text(
                     'Search',
-                    style: GoogleFonts.inter(
+                    style: AppText.inter(
                       fontSize: 24,
                       fontWeight: FontWeight.w800,
                       color: AppColors.ink,
@@ -85,7 +85,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   const SizedBox(height: 16),
                   Text(
                     _query.isEmpty ? 'Recent threads' : 'Results for "$_query"',
-                    style: GoogleFonts.inter(
+                    style: AppText.inter(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                       color: AppColors.muted,
@@ -171,7 +171,7 @@ class _SearchMessage extends StatelessWidget {
           Text(
             text,
             textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
+            style: AppText.inter(
               fontSize: 15,
               fontWeight: FontWeight.w600,
               color: AppColors.body,

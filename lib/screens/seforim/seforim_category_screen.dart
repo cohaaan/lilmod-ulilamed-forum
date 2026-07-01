@@ -7,6 +7,7 @@ import '../../models/seforim.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/async.dart';
 import '../../widgets/seforim_rows.dart';
+import '../../theme/app_text.dart';
 
 /// A sub-level of the library tree. Normally handed its [node] via `extra`;
 /// on a cold deep-link it falls back to locating a matching top-level category.
@@ -62,7 +63,7 @@ class _SeforimCategoryScreenState extends State<SeforimCategoryScreen> {
             return Center(
               child: Text(
                 'Nothing to show here.',
-                style: GoogleFonts.inter(fontSize: 14, color: AppColors.muted),
+                style: AppText.inter(fontSize: 14, color: AppColors.muted),
               ),
             );
           }
@@ -72,7 +73,7 @@ class _SeforimCategoryScreenState extends State<SeforimCategoryScreen> {
               if (node.description.isNotEmpty) ...[
                 Text(
                   node.description,
-                  style: GoogleFonts.inter(
+                  style: AppText.inter(
                     fontSize: 13.5,
                     height: 1.45,
                     color: AppColors.muted,

@@ -28,3 +28,8 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
+  fonts:
+    # Bundled Hebrew fallback so Hebrew glyphs are present at first paint.
+    - family: NotoSansHebrew
+      fonts:
+        - asset: assets/fonts/NotoSansHebrew-VariableFont.ttf

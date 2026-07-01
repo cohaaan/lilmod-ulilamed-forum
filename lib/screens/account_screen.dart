@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../data/repositories.dart';
@@ -9,6 +8,7 @@ import '../widgets/avatar.dart';
 import '../widgets/soft_card.dart';
 import 'bookmarks_screen.dart';
 import 'edit_profile_screen.dart';
+import '../theme/app_text.dart';
 
 class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});
@@ -65,7 +65,7 @@ class _AccountScreenState extends State<AccountScreen> {
         ),
         title: Text(
           'Account',
-          style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700),
+          style: AppText.inter(fontSize: 16, fontWeight: FontWeight.w700),
         ),
       ),
       body: ListView(
@@ -93,7 +93,7 @@ class _AccountScreenState extends State<AccountScreen> {
                               name,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.inter(
+                              style: AppText.inter(
                                 fontSize: 17,
                                 fontWeight: FontWeight.w700,
                                 color: AppColors.ink,
@@ -105,7 +105,7 @@ class _AccountScreenState extends State<AccountScreen> {
                           email,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.inter(
+                          style: AppText.inter(
                             fontSize: 13,
                             color: AppColors.muted,
                           ),
@@ -166,7 +166,7 @@ class _AccountScreenState extends State<AccountScreen> {
                 borderRadius: BorderRadius.circular(14),
               ),
               textStyle:
-                  GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 14),
+                  AppText.inter(fontWeight: FontWeight.w700, fontSize: 14),
             ),
           ),
         ],
@@ -203,7 +203,7 @@ class _AccountRow extends StatelessWidget {
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.inter(
+                  style: AppText.inter(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
                     color: AppColors.ink,

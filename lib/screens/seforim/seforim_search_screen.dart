@@ -2,12 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../data/repositories.dart';
 import '../../models/seforim.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/soft_card.dart';
+import '../../theme/app_text.dart';
 
 /// Full-text search across the library, debounced. Tapping a hit opens the
 /// reader at that reference.
@@ -54,7 +54,7 @@ class _SeforimSearchScreenState extends State<SeforimSearchScreen> {
         ),
         title: Text(
           'Search seforim',
-          style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700),
+          style: AppText.inter(fontSize: 16, fontWeight: FontWeight.w700),
         ),
       ),
       body: Column(
@@ -128,7 +128,7 @@ class _SeforimSearchScreenState extends State<SeforimSearchScreen> {
                   children: [
                     Text(
                       r.ref,
-                      style: GoogleFonts.inter(
+                      style: AppText.inter(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
                         color: AppColors.indigo,
@@ -139,7 +139,7 @@ class _SeforimSearchScreenState extends State<SeforimSearchScreen> {
                       Text(
                         r.heRef,
                         textDirection: TextDirection.rtl,
-                        style: GoogleFonts.inter(
+                        style: AppText.inter(
                           fontSize: 12.5,
                           color: AppColors.muted,
                         ),
@@ -151,7 +151,7 @@ class _SeforimSearchScreenState extends State<SeforimSearchScreen> {
                         r.snippet,
                         maxLines: 3,
                         overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.inter(
+                        style: AppText.inter(
                           fontSize: 13.5,
                           height: 1.5,
                           color: AppColors.body,
@@ -188,7 +188,7 @@ class _Hint extends StatelessWidget {
             child: Text(
               text,
               textAlign: TextAlign.center,
-              style: GoogleFonts.inter(fontSize: 14, color: AppColors.muted),
+              style: AppText.inter(fontSize: 14, color: AppColors.muted),
             ),
           ),
         ],

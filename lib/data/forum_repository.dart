@@ -159,7 +159,10 @@ class ForumRepository {
           'type': type,
         })
         .select('id')
-        .single();
+        .maybeSingle();
+    if (row == null) {
+      throw Exception('Thread could not be created. Please try again.');
+    }
     return row['id'] as String;
   }
 

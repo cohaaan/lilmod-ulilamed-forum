@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../data/repositories.dart';
 import '../theme/app_colors.dart';
+import '../theme/app_text.dart';
 
 class EditThreadScreen extends StatefulWidget {
   const EditThreadScreen({
@@ -69,7 +69,7 @@ class _EditThreadScreenState extends State<EditThreadScreen> {
       appBar: AppBar(
         title: Text(
           'Edit thread',
-          style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700),
+          style: AppText.inter(fontSize: 16, fontWeight: FontWeight.w700),
         ),
         actions: [
           Padding(
@@ -102,7 +102,7 @@ class _EditThreadScreenState extends State<EditThreadScreen> {
                   onSelected: (_) => setState(() => _type = t),
                   showCheckmark: false,
                   selectedColor: AppColors.indigo.withValues(alpha: 0.12),
-                  labelStyle: GoogleFonts.inter(
+                  labelStyle: AppText.inter(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: selected ? AppColors.indigo : AppColors.body,
@@ -142,7 +142,7 @@ class _EditThreadScreenState extends State<EditThreadScreen> {
               const SizedBox(height: 12),
               Text(
                 _error!,
-                style: GoogleFonts.inter(color: AppColors.like, fontSize: 13),
+                style: AppText.inter(color: AppColors.like, fontSize: 13),
               ),
             ],
           ],
