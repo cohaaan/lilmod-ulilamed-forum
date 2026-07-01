@@ -1,5 +1,12 @@
 # Lilmod Ulilamed — Full Build Plan
 
+> ⚠️ **SUPERSEDED — historical reference only.** This plan assumed a Django/DRF/Postgres
+> backend that was never built, and describes the Flutter app as a "~15–20% UI shell with
+> mock data." Neither is true anymore: the app is a working **Supabase**-backed forum with
+> real threads/replies/likes/bookmarks/auth and a shipped Seforim reader. For current
+> architecture see [`AGENTS.md`](AGENTS.md) / [`CLAUDE.md`](CLAUDE.md); for the Seforim
+> feature see [`SEFORIM_PLAN.md`](SEFORIM_PLAN.md). Do not treat anything below as authoritative.
+
 > Flutter client + new Django/DRF/Postgres backend. Phase 1 = **full social** parity with [beingavra.com](https://beingavra.com/). Phase 2 = rich editor, emoji reactions, Hebrew RTL, article submit/review, advanced forum UI.
 
 ---

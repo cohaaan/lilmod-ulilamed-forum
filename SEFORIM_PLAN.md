@@ -1,5 +1,12 @@
 # SEFORIM_PLAN.md — In-app Sefaria texts ("Seforim" tab)
 
+> ✅ **STATUS: SHIPPED (Milestones 0–5).** This began as a build plan; the feature is now
+> implemented and committed. Code: `lib/data/seforim_repository.dart`, `lib/models/seforim.dart`,
+> `lib/data/seforim_clipboard.dart`, `lib/screens/seforim/` (browse, category, book, reader, search),
+> plus `composer_draft_store.dart`. Read the milestones below as a description of what exists
+> and the design rationale — **not** as an open to-do list. The "Legal / data rules" section is
+> still binding. Live open questions are in the final section.
+
 Goal: a 5th bottom-nav tab **Seforim** that browses the full Sefaria library,
 reads texts natively (Hebrew RTL + English), and lets a user **copy a source
 straight into the reply they're writing** — then return to the exact thread/reply

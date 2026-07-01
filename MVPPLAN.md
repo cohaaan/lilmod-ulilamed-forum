@@ -1,5 +1,10 @@
 # Lilmod Ulilamed — MVP Plan
 
+> ⚠️ **SUPERSEDED — historical reference only.** This assumed a Django/DRF/Postgres backend
+> that was never built. The MVP actually shipped on **Supabase** (real threads/replies/likes/
+> bookmarks/auth) plus an in-app Seforim reader. For current architecture see
+> [`AGENTS.md`](AGENTS.md) / [`CLAUDE.md`](CLAUDE.md). Do not treat anything below as authoritative.
+
 > Flutter client + Django/DRF/Postgres backend. Ship a **testable forum first**, then expand based on real usage.
 
 The full feature inventory lives in [`PLAN.md`](PLAN.md). This document defines what actually ships in the MVP.
