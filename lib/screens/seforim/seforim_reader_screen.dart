@@ -15,6 +15,13 @@ import '../../theme/app_text.dart';
 
 enum _ReaderLang { both, hebrew, english }
 
+/// At or above this width the connections panel docks as a side rail; below it,
+/// tapping a verse opens a bottom sheet.
+const double _wideBreakpoint = 880;
+
+/// Sentinel for the "All" category filter chip in the resource panel.
+const String _allFilter = '__all__';
+
 /// Display order for related-text categories under a verse (mirrors Sefaria).
 const _relatedOrder = [
   'Commentary',
@@ -183,10 +190,57 @@ class _SeforimReaderScreenState extends State<SeforimReaderScreen> {
     }
   }
 
-  /// Toggle selection of a verse (tapping the active verse deselects it).
-  void _select(String verseRef) => setState(
-        () => _selectedRef = _selectedRef == verseRef ? null : verseRef,
-      );
+  /// Open a verse's connections. Tapping the active verse deselects it. On
+  /// narrow screens the connections open in a bottom sheet; on wide screens
+  /// the docked side rail follows the selection.
+  void _openVerse(String verseRef) {
+    final deselect = _selectedRef == verseRef;
+    setState(() => _selectedRef = deselect ? null : verseRef);
+    if (deselect) return;
+    final wide = MediaQuery.of(context).size.width >= _wideBreakpoint;
+    if (!wide) _showConnectionsSheet(verseRef);
+  }
+
+  Future<void> _showConnectionsSheet(String verseRef) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: SeforimPalette.paper,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.6,
+        minChildSize: 0.3,
+        maxChildSize: 0.92,
+        builder: (context, scrollController) => _ResourcePanel(
+          verseRef: verseRef,
+          lang: _lang,
+          scrollController: scrollController,
+          onCopyVerse: () => _copySelectedVerse(verseRef),
+          onCopyComment: _copyCommentToReply,
+        ),
+      ),
+    );
+    // Clear the highlight once the sheet is dismissed (unless a new verse was
+    // selected in the meantime).
+    if (mounted && _selectedRef == verseRef) {
+      setState(() => _selectedRef = null);
+    }
+  }
+
+  /// Copy the currently-selected verse itself (not a source) to a reply.
+  void _copySelectedVerse(String verseRef) {
+    for (final p in _sections) {
+      for (final seg in p.segments) {
+        if ('${p.ref}:${seg.number}' == verseRef) {
+          _copyToReply(p, seg);
+          return;
+        }
+      }
+    }
+  }
 
   void _copyToReply(SeforimPassage p, SeforimSegment seg) {
     final threadId = seforimClipboard.addSegmentForReply(
@@ -198,8 +252,10 @@ class _SeforimReaderScreenState extends State<SeforimReaderScreen> {
       context.go('/threads/$threadId');
       return;
     }
-    _toast('Added to reply — open a thread to insert it',
-        icon: Icons.reply_rounded);
+    _toast(
+      'Added to reply — open a thread to insert it',
+      icon: Icons.reply_rounded,
+    );
   }
 
   void _copyCommentToReply(SeforimComment c) {
@@ -212,8 +268,10 @@ class _SeforimReaderScreenState extends State<SeforimReaderScreen> {
       context.go('/threads/$threadId');
       return;
     }
-    _toast('Added to reply — open a thread to insert it',
-        icon: Icons.reply_rounded);
+    _toast(
+      'Added to reply — open a thread to insert it',
+      icon: Icons.reply_rounded,
+    );
   }
 
   void _toast(String msg, {IconData icon = Icons.check_rounded}) {
@@ -229,8 +287,10 @@ class _SeforimReaderScreenState extends State<SeforimReaderScreen> {
               Icon(icon, color: Colors.white, size: 18),
               const SizedBox(width: 10),
               Expanded(
-                child: Text(msg,
-                    style: const TextStyle(color: Colors.white, fontSize: 13)),
+                child: Text(
+                  msg,
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                ),
               ),
             ],
           ),
@@ -255,7 +315,10 @@ class _SeforimReaderScreenState extends State<SeforimReaderScreen> {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: GoogleFonts.ebGaramond(
-              fontSize: 19, fontWeight: FontWeight.w600, color: AppColors.ink),
+            fontSize: 19,
+            fontWeight: FontWeight.w600,
+            color: AppColors.ink,
+          ),
         ),
         actions: [
           PopupMenuButton<_ReaderLang>(
@@ -264,79 +327,146 @@ class _SeforimReaderScreenState extends State<SeforimReaderScreen> {
             initialValue: _lang,
             onSelected: (v) => setState(() => _lang = v),
             itemBuilder: (context) => const [
-              PopupMenuItem(value: _ReaderLang.both, child: Text('Hebrew & English')),
-              PopupMenuItem(value: _ReaderLang.hebrew, child: Text('Hebrew only')),
-              PopupMenuItem(value: _ReaderLang.english, child: Text('English only')),
+              PopupMenuItem(
+                value: _ReaderLang.both,
+                child: Text('Hebrew & English'),
+              ),
+              PopupMenuItem(
+                value: _ReaderLang.hebrew,
+                child: Text('Hebrew only'),
+              ),
+              PopupMenuItem(
+                value: _ReaderLang.english,
+                child: Text('English only'),
+              ),
             ],
           ),
         ],
       ),
-      body: AsyncView<SeforimPassage>(
-        future: _future,
-        onRetry: () => _reload(_ref),
-        builder: (context, p) {
-          if (_sections.isEmpty || p.segments.isEmpty) {
-            return Center(
-              child: Text(
-                'No text available for this section.',
-                style: AppText.inter(fontSize: 14, color: AppColors.muted),
-              ),
-            );
-          }
-          // Segments exist but none are visible in the selected language
-          // (e.g. "English only" on a text with no translation) — otherwise the
-          // body would render blank with no explanation.
-          final hasVisible = p.segments.any((seg) =>
-              (_lang != _ReaderLang.english && seg.hasHe) ||
-              (_lang != _ReaderLang.hebrew && seg.hasEn));
-          if (!hasVisible) {
-            final lang = _lang == _ReaderLang.english ? 'English' : 'Hebrew';
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text(
-                  'No $lang text available for this section.\n'
-                  'Try switching language from the menu above.',
-                  textAlign: TextAlign.center,
-                  style: AppText.inter(
-                    fontSize: 14,
-                    height: 1.5,
-                    color: AppColors.muted,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final wide = constraints.maxWidth >= _wideBreakpoint;
+          final reader = AsyncView<SeforimPassage>(
+            future: _future,
+            onRetry: () => _reload(_ref),
+            builder: (context, p) {
+              if (_sections.isEmpty || p.segments.isEmpty) {
+                return Center(
+                  child: Text(
+                    'No text available for this section.',
+                    style: AppText.inter(fontSize: 14, color: AppColors.muted),
+                  ),
+                );
+              }
+              // Segments exist but none are visible in the selected language
+              // (e.g. "English only" on a text with no translation) — otherwise the
+              // body would render blank with no explanation.
+              final hasVisible = p.segments.any(
+                (seg) =>
+                    (_lang != _ReaderLang.english && seg.hasHe) ||
+                    (_lang != _ReaderLang.hebrew && seg.hasEn),
+              );
+              if (!hasVisible) {
+                final lang = _lang == _ReaderLang.english
+                    ? 'English'
+                    : 'Hebrew';
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Text(
+                      'No $lang text available for this section.\n'
+                      'Try switching language from the menu above.',
+                      textAlign: TextAlign.center,
+                      style: AppText.inter(
+                        fontSize: 14,
+                        height: 1.5,
+                        color: AppColors.muted,
+                      ),
+                    ),
+                  ),
+                );
+              }
+              return SelectionArea(
+                child: CustomScrollView(
+                  controller: _controller,
+                  center: _centerKey,
+                  slivers: [
+                    // Sections above the anchor grow upward, so they're listed
+                    // nearest-anchor-first; the top status sits above them all.
+                    SliverList(
+                      delegate: SliverChildListDelegate([
+                        for (var i = _anchorIndex - 1; i >= 0; i--)
+                          _sectionSlab(_sections[i]),
+                        _topStatus(),
+                      ]),
+                    ),
+                    // The anchor section and everything below it.
+                    SliverList(
+                      key: _centerKey,
+                      delegate: SliverChildListDelegate([
+                        for (var i = _anchorIndex; i < _sections.length; i++)
+                          _sectionSlab(_sections[i]),
+                        _bottomStatus(_sections.last),
+                      ]),
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+          if (!wide) return reader;
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(child: reader),
+              Container(
+                width: 360,
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  border: Border(
+                    left: BorderSide(color: SeforimPalette.paperLine),
                   ),
                 ),
+                child: _selectedRef == null
+                    ? _panelPlaceholder()
+                    : _ResourcePanel(
+                        key: ValueKey(_selectedRef),
+                        verseRef: _selectedRef!,
+                        lang: _lang,
+                        onCopyVerse: () => _copySelectedVerse(_selectedRef!),
+                        onCopyComment: _copyCommentToReply,
+                        onClose: () => setState(() => _selectedRef = null),
+                      ),
               ),
-            );
-          }
-          return SelectionArea(
-            child: CustomScrollView(
-              controller: _controller,
-              center: _centerKey,
-              slivers: [
-                // Sections above the anchor grow upward, so they're listed
-                // nearest-anchor-first; the top status sits above them all.
-                SliverList(
-                  delegate: SliverChildListDelegate([
-                    for (var i = _anchorIndex - 1; i >= 0; i--)
-                      _sectionSlab(_sections[i]),
-                    _topStatus(),
-                  ]),
-                ),
-                // The anchor section and everything below it.
-                SliverList(
-                  key: _centerKey,
-                  delegate: SliverChildListDelegate([
-                    for (var i = _anchorIndex; i < _sections.length; i++)
-                      _sectionSlab(_sections[i]),
-                    _bottomStatus(_sections.last),
-                  ]),
-                ),
-              ],
-            ),
+            ],
           );
         },
       ),
     );
   }
+
+  /// Placeholder shown in the docked rail when no verse is selected (wide only).
+  Widget _panelPlaceholder() => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.menu_book_rounded, size: 34, color: AppColors.muted),
+          const SizedBox(height: 12),
+          Text(
+            'Tap a verse to see its\ncommentaries and sources',
+            textAlign: TextAlign.center,
+            style: AppText.inter(
+              fontSize: 13,
+              height: 1.5,
+              color: AppColors.muted,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 
   /// One loaded section: its Hebrew heading followed by its verses.
   Widget _sectionSlab(SeforimPassage p) {
@@ -362,7 +492,10 @@ class _SeforimReaderScreenState extends State<SeforimReaderScreen> {
                   ),
                   const SizedBox(height: 10),
                   Container(
-                      width: 40, height: 2, color: SeforimPalette.paperLine),
+                    width: 40,
+                    height: 2,
+                    color: SeforimPalette.paperLine,
+                  ),
                 ],
               ),
             ),
@@ -370,11 +503,8 @@ class _SeforimReaderScreenState extends State<SeforimReaderScreen> {
             _SegmentView(
               segment: seg,
               lang: _lang,
-              verseRef: '${p.ref}:${seg.number}',
               selected: _selectedRef == '${p.ref}:${seg.number}',
-              onTap: () => _select('${p.ref}:${seg.number}'),
-              onCopyToReply: () => _copyToReply(p, seg),
-              onCopyComment: _copyCommentToReply,
+              onTap: () => _openVerse('${p.ref}:${seg.number}'),
             ),
         ],
       ),
@@ -435,58 +565,52 @@ class _SeforimReaderScreenState extends State<SeforimReaderScreen> {
   }
 
   Widget _loaderRow() => const Padding(
-        padding: EdgeInsets.symmetric(vertical: 16),
-        child: Center(
-          child: SizedBox(
-            width: 20,
-            height: 20,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-        ),
-      );
+    padding: EdgeInsets.symmetric(vertical: 16),
+    child: Center(
+      child: SizedBox(
+        width: 20,
+        height: 20,
+        child: CircularProgressIndicator(strokeWidth: 2),
+      ),
+    ),
+  );
 
   Widget _retryRow(String message, VoidCallback onRetry) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Column(
-          children: [
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: AppText.inter(fontSize: 12.5, color: AppColors.muted),
-            ),
-            const SizedBox(height: 4),
-            TextButton.icon(
-              onPressed: onRetry,
-              icon: const Icon(Icons.refresh_rounded, size: 16),
-              label: const Text('Retry'),
-              style: TextButton.styleFrom(foregroundColor: AppColors.indigo),
-            ),
-          ],
+    padding: const EdgeInsets.symmetric(vertical: 12),
+    child: Column(
+      children: [
+        Text(
+          message,
+          textAlign: TextAlign.center,
+          style: AppText.inter(fontSize: 12.5, color: AppColors.muted),
         ),
-      );
+        const SizedBox(height: 4),
+        TextButton.icon(
+          onPressed: onRetry,
+          icon: const Icon(Icons.refresh_rounded, size: 16),
+          label: const Text('Retry'),
+          style: TextButton.styleFrom(foregroundColor: AppColors.indigo),
+        ),
+      ],
+    ),
+  );
 }
 
 /// One verse on the paper page. Flows quietly by default; when [selected] it
-/// highlights, reveals its mekoros, and surfaces the per-verse "copy to reply"
-/// action. Selection state is owned by the reader, not the card.
+/// highlights. Tapping opens the verse's connections (bottom sheet on narrow
+/// screens, docked rail on wide) — selection state is owned by the reader.
 class _SegmentView extends StatelessWidget {
   const _SegmentView({
     required this.segment,
     required this.lang,
-    required this.verseRef,
     required this.selected,
     required this.onTap,
-    required this.onCopyToReply,
-    required this.onCopyComment,
   });
 
   final SeforimSegment segment;
   final _ReaderLang lang;
-  final String verseRef;
   final bool selected;
   final VoidCallback onTap;
-  final VoidCallback onCopyToReply;
-  final void Function(SeforimComment) onCopyComment;
 
   @override
   Widget build(BuildContext context) {
@@ -563,53 +687,45 @@ class _SegmentView extends StatelessWidget {
               ),
             ),
           ),
-          if (selected) ...[
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
-              child: _VerseCommentaries(
-                verseRef: verseRef,
-                lang: lang,
-                onCopyToReply: onCopyComment,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 0, 8, 10),
-              child: Align(
-                alignment: Alignment.centerRight,
-                child: _SegmentAction(
-                  icon: Icons.reply_rounded,
-                  label: 'Copy to reply',
-                  primary: true,
-                  onTap: onCopyToReply,
-                ),
-              ),
-            ),
-          ],
         ],
       ),
     );
   }
 }
 
-/// Related texts (mekoros) for a verse — shown when the verse text is tapped.
-/// Fetches lazily on first open.
-class _VerseCommentaries extends StatefulWidget {
-  const _VerseCommentaries({
+/// The connections (mekoros) panel for the selected verse — a bottom sheet on
+/// narrow screens, a docked side rail on wide ones. Shows category filter chips
+/// across the top and the related sources grouped by category below. Fetches
+/// lazily; sources load their text on demand when expanded.
+class _ResourcePanel extends StatefulWidget {
+  const _ResourcePanel({
+    super.key,
     required this.verseRef,
     required this.lang,
-    required this.onCopyToReply,
+    required this.onCopyVerse,
+    required this.onCopyComment,
+    this.scrollController,
+    this.onClose,
   });
 
   final String verseRef;
   final _ReaderLang lang;
-  final void Function(SeforimComment) onCopyToReply;
+  final VoidCallback onCopyVerse;
+  final void Function(SeforimComment) onCopyComment;
+
+  /// Provided by the bottom-sheet host so drag-to-expand drives the list.
+  final ScrollController? scrollController;
+
+  /// Provided by the docked rail so it can be dismissed.
+  final VoidCallback? onClose;
 
   @override
-  State<_VerseCommentaries> createState() => _VerseCommentariesState();
+  State<_ResourcePanel> createState() => _ResourcePanelState();
 }
 
-class _VerseCommentariesState extends State<_VerseCommentaries> {
-  Future<List<SeforimComment>>? _future;
+class _ResourcePanelState extends State<_ResourcePanel> {
+  late Future<List<SeforimComment>> _future;
+  String _filter = _allFilter;
 
   @override
   void initState() {
@@ -618,75 +734,193 @@ class _VerseCommentariesState extends State<_VerseCommentaries> {
   }
 
   @override
+  void didUpdateWidget(covariant _ResourcePanel old) {
+    super.didUpdateWidget(old);
+    if (old.verseRef != widget.verseRef) {
+      _future = seforimRepository.fetchRelated(widget.verseRef);
+      _filter = _allFilter;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<SeforimComment>>(
-      future: _future,
-      builder: (context, snap) {
-        if (snap.connectionState != ConnectionState.done) {
-          return const Padding(
-            padding: EdgeInsets.fromLTRB(4, 10, 4, 4),
-            child: Center(
-              child: SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
+    final isSheet = widget.scrollController != null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (isSheet)
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(top: 10, bottom: 6),
+              decoration: BoxDecoration(
+                color: SeforimPalette.paperLine,
+                borderRadius: BorderRadius.circular(2),
               ),
             ),
-          );
-        }
-        if (snap.hasError) {
-          return Padding(
-            padding: const EdgeInsets.fromLTRB(4, 10, 4, 4),
-            child: Text(
-              'Could not load mekoros.',
-              style:
-                  AppText.inter(fontSize: 12.5, color: AppColors.muted),
-            ),
-          );
-        }
-        final items = snap.data ?? const <SeforimComment>[];
-        if (items.isEmpty) {
-          return Padding(
-            padding: const EdgeInsets.fromLTRB(4, 10, 4, 4),
-            child: Text(
-              'No mekoros on this verse.',
-              style:
-                  AppText.inter(fontSize: 12.5, color: AppColors.muted),
-            ),
-          );
-        }
-        final byCat = <String, List<SeforimComment>>{};
-        for (final c in items) {
-          byCat.putIfAbsent(c.category, () => []).add(c);
-        }
-        final cats = _relatedOrder.where(byCat.containsKey).toList();
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 10, 4, 2),
-              child: Text(
-                'מקורות',
-                textDirection: TextDirection.rtl,
-                style: GoogleFonts.frankRuhlLibre(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.indigo,
-                ),
-              ),
-            ),
-            for (final cat in cats)
-              _RelatedCategory(
-                category: cat,
-                items: byCat[cat]!,
-                lang: widget.lang,
-                onCopyToReply: widget.onCopyToReply,
-              ),
-          ],
-        );
-      },
+          ),
+        _header(),
+        Divider(height: 1, color: SeforimPalette.paperLine),
+        Flexible(
+          child: FutureBuilder<List<SeforimComment>>(
+            future: _future,
+            builder: (context, snap) {
+              if (snap.connectionState != ConnectionState.done) {
+                return const Padding(
+                  padding: EdgeInsets.all(28),
+                  child: Center(
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                );
+              }
+              if (snap.hasError) {
+                return _message('Could not load connections.');
+              }
+              final items = snap.data ?? const <SeforimComment>[];
+              if (items.isEmpty) {
+                return _message('No connections on this verse.');
+              }
+              final byCat = <String, List<SeforimComment>>{};
+              for (final c in items) {
+                byCat.putIfAbsent(c.category, () => []).add(c);
+              }
+              final present = _relatedOrder.where(byCat.containsKey).toList();
+              // A stale filter (verse changed) falls back to All.
+              final active = present.contains(_filter) ? _filter : _allFilter;
+              final visible = active == _allFilter
+                  ? present
+                  : present.where((c) => c == active).toList();
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _filterChips(present, active),
+                  Flexible(
+                    child: ListView(
+                      controller: widget.scrollController,
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 28),
+                      children: [
+                        for (final cat in visible)
+                          _RelatedCategory(
+                            category: cat,
+                            items: byCat[cat]!,
+                            lang: widget.lang,
+                            onCopyToReply: widget.onCopyComment,
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
+
+  Widget _header() {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        16,
+        widget.scrollController != null ? 4 : 12,
+        8,
+        10,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Connections',
+                  style: AppText.inter(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.muted,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  widget.verseRef,
+                  style: GoogleFonts.ebGaramond(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.ink,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          _SegmentAction(
+            icon: Icons.reply_rounded,
+            label: 'Copy verse',
+            primary: true,
+            onTap: widget.onCopyVerse,
+          ),
+          if (widget.onClose != null)
+            IconButton(
+              tooltip: 'Close',
+              icon: const Icon(Icons.close_rounded, size: 20),
+              color: AppColors.muted,
+              onPressed: widget.onClose,
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _filterChips(List<String> present, String active) {
+    final options = <String>[_allFilter, ...present];
+    return SizedBox(
+      height: 46,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        itemCount: options.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, i) {
+          final cat = options[i];
+          final selected = cat == active;
+          return ChoiceChip(
+            label: Text(cat == _allFilter ? 'All' : cat),
+            selected: selected,
+            showCheckmark: false,
+            labelStyle: AppText.inter(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+              color: selected ? Colors.white : AppColors.body,
+            ),
+            backgroundColor: AppColors.surface,
+            selectedColor: AppColors.indigo,
+            side: BorderSide(
+              color: selected ? AppColors.indigo : SeforimPalette.paperLine,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(999),
+            ),
+            onSelected: (_) => setState(() => _filter = cat),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _message(String text) => Padding(
+    padding: const EdgeInsets.all(24),
+    child: Text(
+      text,
+      textAlign: TextAlign.center,
+      style: AppText.inter(fontSize: 13, color: AppColors.muted),
+    ),
+  );
 }
 
 /// A related-text category (Commentary, Midrash, …): a small header with a
@@ -710,10 +944,12 @@ class _RelatedCategory extends StatelessWidget {
     final order = <String>[];
     final byWork = <String, List<SeforimComment>>{};
     for (final c in items) {
-      byWork.putIfAbsent(c.commentator, () {
-        order.add(c.commentator);
-        return <SeforimComment>[];
-      }).add(c);
+      byWork
+          .putIfAbsent(c.commentator, () {
+            order.add(c.commentator);
+            return <SeforimComment>[];
+          })
+          .add(c);
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -804,8 +1040,9 @@ class _CommentatorTileState extends State<_CommentatorTile> {
                   Expanded(
                     child: Text(
                       hasHe ? widget.heName : widget.name,
-                      textDirection:
-                          hasHe ? TextDirection.rtl : TextDirection.ltr,
+                      textDirection: hasHe
+                          ? TextDirection.rtl
+                          : TextDirection.ltr,
                       style: GoogleFonts.frankRuhlLibre(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
@@ -863,8 +1100,8 @@ class _LazyCommentText extends StatefulWidget {
 }
 
 class _LazyCommentTextState extends State<_LazyCommentText> {
-  late final Future<({String he, String en})> _future =
-      seforimRepository.fetchSourceText(widget.source.ref);
+  late final Future<({String he, String en})> _future = seforimRepository
+      .fetchSourceText(widget.source.ref);
 
   @override
   Widget build(BuildContext context) {
@@ -886,8 +1123,7 @@ class _LazyCommentTextState extends State<_LazyCommentText> {
             padding: const EdgeInsets.symmetric(vertical: 6),
             child: Text(
               'Could not load this source.',
-              style:
-                  AppText.inter(fontSize: 12.5, color: AppColors.muted),
+              style: AppText.inter(fontSize: 12.5, color: AppColors.muted),
             ),
           );
         }
@@ -1018,16 +1254,22 @@ class _Attribution extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final versions = <SeforimAttribution>[
-      if (passage.heAttribution != null) passage.heAttribution!,
-      if (passage.enAttribution != null) passage.enAttribution!,
-    ].where((a) =>
-        a.versionTitle.isNotEmpty ||
-        a.source.isNotEmpty ||
-        a.license.isNotEmpty).toList();
+    final versions =
+        <SeforimAttribution>[
+              if (passage.heAttribution != null) passage.heAttribution!,
+              if (passage.enAttribution != null) passage.enAttribution!,
+            ]
+            .where(
+              (a) =>
+                  a.versionTitle.isNotEmpty ||
+                  a.source.isNotEmpty ||
+                  a.license.isNotEmpty,
+            )
+            .toList();
 
-    final webUrl =
-        passage.ref.isNotEmpty ? SeforimConfig.webUrl(passage.ref) : '';
+    final webUrl = passage.ref.isNotEmpty
+        ? SeforimConfig.webUrl(passage.ref)
+        : '';
     if (versions.isEmpty && webUrl.isEmpty) return const SizedBox.shrink();
 
     return Container(
@@ -1085,8 +1327,11 @@ class _Attribution extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 4),
-                    Icon(Icons.open_in_new_rounded,
-                        size: 13, color: AppColors.indigo),
+                    Icon(
+                      Icons.open_in_new_rounded,
+                      size: 13,
+                      color: AppColors.indigo,
+                    ),
                   ],
                 ),
               ),
