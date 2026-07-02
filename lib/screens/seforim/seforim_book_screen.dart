@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../data/repositories.dart';
+import '../../data/seforim_prefs.dart';
 import '../../models/seforim.dart';
 import '../../theme/seforim_palette.dart';
 import '../../widgets/async.dart';
@@ -58,91 +59,105 @@ class _SeforimBookScreenState extends State<SeforimBookScreen> {
           onPressed: () =>
               context.canPop() ? context.pop() : context.go('/seforim'),
         ),
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: 12),
+            child: Center(child: SeforimLangToggle()),
+          ),
+        ],
       ),
-      body: AsyncView<List<ShapeNode>>(
-        future: _future,
-        onRetry: () => setState(
-          () => _future = seforimRepository.fetchShape(widget.title),
-        ),
-        builder: (context, nodes) {
-          // Complex / multi-part work: list each part; the reader handles the
-          // rest via prev/next.
-          final simple = nodes.length == 1 && nodes.first.isSimple;
-          if (!simple) {
-            final firstRef = nodes.isEmpty || nodes.first.title.isEmpty
-                ? widget.title
-                : nodes.first.title;
+      body: ValueListenableBuilder<bool>(
+        valueListenable: seforimHebrewMode,
+        builder: (context, hebrew, _) => AsyncView<List<ShapeNode>>(
+          future: _future,
+          onRetry: () => setState(
+            () => _future = seforimRepository.fetchShape(widget.title),
+          ),
+          builder: (context, nodes) {
+            // Complex / multi-part work: list each part; the reader handles the
+            // rest via prev/next.
+            final simple = nodes.length == 1 && nodes.first.isSimple;
+            if (!simple) {
+              final firstRef = nodes.isEmpty || nodes.first.title.isEmpty
+                  ? widget.title
+                  : nodes.first.title;
+              return ListView(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+                children: [
+                  ..._header(startRef: firstRef, hebrew: hebrew),
+                  for (var i = 0; i < nodes.length; i++)
+                    seforimSectionRow(
+                      label: nodes[i].title.isEmpty
+                          ? widget.title
+                          : nodes[i].title,
+                      heLabel: nodes[i].heTitle,
+                      showDivider: i != nodes.length - 1,
+                      hebrew: hebrew,
+                      onTap: () => _openRef(
+                        nodes[i].title.isEmpty ? widget.title : nodes[i].title,
+                      ),
+                    ),
+                ],
+              );
+            }
+
+            final entries = _entries(nodes.first);
             return ListView(
               padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
               children: [
-                ..._header(startRef: firstRef),
-                for (var i = 0; i < nodes.length; i++)
-                  seforimSectionRow(
-                    label: nodes[i].title.isEmpty
-                        ? widget.title
-                        : nodes[i].title,
-                    heLabel: nodes[i].heTitle,
-                    showDivider: i != nodes.length - 1,
-                    onTap: () => _openRef(
-                      nodes[i].title.isEmpty ? widget.title : nodes[i].title,
-                    ),
+                ..._header(
+                  startRef: entries.isEmpty ? null : entries.first.ref,
+                  hebrew: hebrew,
+                ),
+                Text(
+                  _isTalmud ? 'Daf' : 'Chapter',
+                  style: SeforimText.sans(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: SeforimPalette.secondary,
                   ),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final e in entries)
+                      _SectionBox(label: e.label, onTap: () => _openRef(e.ref)),
+                  ],
+                ),
               ],
             );
-          }
-
-          final entries = _entries(nodes.first);
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
-            children: [
-              ..._header(startRef: entries.isEmpty ? null : entries.first.ref),
-              Text(
-                _isTalmud ? 'Daf' : 'Chapter',
-                style: SeforimText.sans(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: SeforimPalette.secondary,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final e in entries)
-                    _SectionBox(label: e.label, onTap: () => _openRef(e.ref)),
-                ],
-              ),
-            ],
-          );
-        },
+          },
+        ),
       ),
     );
   }
 
-  /// Book header, Sefaria TOC style: Cardo title, small-caps category line,
-  /// Hebrew title, description, and a navy "Start Reading" button.
-  List<Widget> _header({String? startRef}) {
+  /// Book header, Sefaria TOC style: Cardo title (Taamey Frank in Hebrew
+  /// mode — one language at a time), small-caps category line, description,
+  /// and a navy "Start Reading" button.
+  List<Widget> _header({String? startRef, bool hebrew = false}) {
     final node = widget.node;
     final category = node?.colorKey ?? '';
+    final useHe = hebrew && (node?.heLabel.isNotEmpty ?? false);
     return [
       Text(
-        widget.title,
-        style: SeforimText.serif(
-          fontSize: 30,
-          color: SeforimPalette.black,
-          height: 1.2,
-        ),
+        useHe ? node!.heLabel : widget.title,
+        textDirection: useHe ? TextDirection.rtl : TextDirection.ltr,
+        textAlign: useHe ? TextAlign.right : TextAlign.left,
+        style: useHe
+            ? SeforimText.hebrew(
+                fontSize: 28,
+                color: SeforimPalette.black,
+                height: 1.2,
+              )
+            : SeforimText.serif(
+                fontSize: 30,
+                color: SeforimPalette.black,
+                height: 1.2,
+              ),
       ),
-      if (node != null && node.heLabel.isNotEmpty) ...[
-        const SizedBox(height: 2),
-        Text(
-          node.heLabel,
-          textDirection: TextDirection.rtl,
-          textAlign: TextAlign.left,
-          style: SeforimText.hebrew(fontSize: 22, color: SeforimPalette.black),
-        ),
-      ],
       if (category.isNotEmpty) ...[
         const SizedBox(height: 6),
         Text(

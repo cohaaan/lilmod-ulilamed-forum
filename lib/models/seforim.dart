@@ -204,6 +204,8 @@ class SeforimComment {
     required this.heRef,
     required this.he,
     required this.en,
+    this.indexTitle = '',
+    this.sourceHasEn = false,
   });
 
   /// Sefaria link category, e.g. "Commentary", "Midrash", "Talmud".
@@ -221,8 +223,32 @@ class SeforimComment {
   final String he;
   final String en;
 
+  /// The work's index title (e.g. "Rashi on Genesis"), for about-the-work
+  /// lookups.
+  final String indexTitle;
+
+  /// Whether Sefaria has an English text for this source (the א/A badge).
+  final bool sourceHasEn;
+
   bool get hasHe => he.trim().isNotEmpty;
   bool get hasEn => en.trim().isNotEmpty;
+}
+
+/// About-the-work metadata (author blurb, era, place) from the index API —
+/// shown when a commentator tile is expanded, like Sefaria's author line.
+class SeforimWorkAbout {
+  const SeforimWorkAbout({
+    required this.description,
+    required this.composedLine,
+  });
+
+  /// English description of the work/author (may be empty).
+  final String description;
+
+  /// "Composed: Middle-Age France, c.1075 – c.1105" style line (may be empty).
+  final String composedLine;
+
+  bool get isEmpty => description.isEmpty && composedLine.isEmpty;
 }
 
 /// A search result pointing at a reference.

@@ -33,6 +33,38 @@ const _relatedOrder = [
   'Jewish Thought',
 ];
 
+/// Canonical "top spots" for works within a related-text group, by the corpus
+/// of the base text being read — the traditional precedence Sefaria also uses
+/// (Rashi first on Tanakh/Talmud, Bartenura first on Mishnah); everything
+/// else follows alphabetically.
+const _topWorksByCorpus = <String, List<String>>{
+  'Tanakh': ['Rashi', 'Ibn Ezra', 'Ramban', 'Sforno'],
+  'Talmud': ['Rashi', 'Rashbam', 'Tosafot'],
+  'Mishnah': [
+    'Bartenura',
+    'English Explanation of Mishnah',
+    'Rambam',
+    'Ikar Tosafot Yom Tov',
+    'Yachin',
+    'Boaz',
+  ],
+};
+
+/// Sort work names in place: corpus top-list first, then alphabetical.
+void _sortWorks(List<String> names, String corpus) {
+  final top = _topWorksByCorpus[corpus] ?? const <String>[];
+  int rank(String n) {
+    final i = top.indexOf(n);
+    return i == -1 ? 999 : i;
+  }
+
+  names.sort((a, b) {
+    final ra = rank(a), rb = rank(b);
+    if (ra != rb) return ra - rb;
+    return a.compareTo(b);
+  });
+}
+
 /// Hebrew labels for those categories.
 const _relatedHeLabels = {
   'Commentary': 'מפרשים',
@@ -117,7 +149,25 @@ class _SeforimReaderScreenState extends State<SeforimReaderScreen> {
     _appendFailed = _prependFailed = false;
     return seforimRepository.fetchPassage(ref).then((p) {
       _sections.add(p);
+      _resolveCorpus(p.book);
       return p;
+    });
+  }
+
+  /// The corpus (Tanakh / Talmud / Mishnah…) of the book being read — drives
+  /// the canonical work ordering in the connections panel.
+  String _corpus = '';
+
+  void _resolveCorpus(String book) {
+    if (book.isEmpty) return;
+    seforimRepository.findBook(book).then((node) {
+      if (!mounted || node == null) return;
+      final corpus = node.categories.isNotEmpty
+          ? node.categories.first
+          : (node.primaryCategory ?? '');
+      if (corpus.isNotEmpty && corpus != _corpus) {
+        setState(() => _corpus = corpus);
+      }
     });
   }
 
@@ -212,12 +262,17 @@ class _SeforimReaderScreenState extends State<SeforimReaderScreen> {
         initialChildSize: 0.6,
         minChildSize: 0.3,
         maxChildSize: 0.92,
-        builder: (context, scrollController) => _ResourcePanel(
-          verseRef: verseRef,
-          lang: _lang,
-          scrollController: scrollController,
-          onCopyVerse: () => _copySelectedVerse(verseRef),
-          onCopyComment: _copyCommentToReply,
+        // SelectionArea so commentary text is word-selectable on touch too
+        // (long-press a word to start selecting).
+        builder: (context, scrollController) => SelectionArea(
+          child: _ResourcePanel(
+            verseRef: verseRef,
+            lang: _lang,
+            corpus: _corpus,
+            scrollController: scrollController,
+            onCopyVerse: () => _copySelectedVerse(verseRef),
+            onCopyComment: _copyCommentToReply,
+          ),
         ),
       ),
     );
@@ -318,7 +373,23 @@ class _SeforimReaderScreenState extends State<SeforimReaderScreen> {
         actions: [
           PopupMenuButton<_ReaderLang>(
             tooltip: 'Language',
-            icon: const Icon(Icons.translate_rounded, size: 20),
+            // Sefaria-style א box instead of the generic translate glyph.
+            icon: Container(
+              width: 32,
+              height: 32,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: SeforimPalette.paperLine),
+              ),
+              child: Text(
+                'א',
+                style: SeforimText.hebrew(
+                  fontSize: 16,
+                  color: SeforimPalette.secondary,
+                ),
+              ),
+            ),
             initialValue: _lang,
             onSelected: (v) => setState(() => _lang = v),
             itemBuilder: (context) => const [
@@ -431,6 +502,7 @@ class _SeforimReaderScreenState extends State<SeforimReaderScreen> {
                         key: ValueKey(_selectedRef),
                         verseRef: _selectedRef!,
                         lang: _lang,
+                        corpus: _corpus,
                         onCopyVerse: () => _copySelectedVerse(_selectedRef!),
                         onCopyComment: _copyCommentToReply,
                         onClose: () => setState(() => _selectedRef = null),
@@ -733,12 +805,17 @@ class _ResourcePanel extends StatefulWidget {
     required this.lang,
     required this.onCopyVerse,
     required this.onCopyComment,
+    this.corpus = '',
     this.scrollController,
     this.onClose,
   });
 
   final String verseRef;
   final _ReaderLang lang;
+
+  /// Corpus of the base text (Tanakh / Talmud / Mishnah…) — drives the
+  /// canonical work ordering within each related-text group.
+  final String corpus;
   final VoidCallback onCopyVerse;
   final void Function(SeforimComment) onCopyComment;
 
@@ -838,6 +915,7 @@ class _ResourcePanelState extends State<_ResourcePanel> {
                             category: cat,
                             items: byCat[cat]!,
                             lang: widget.lang,
+                            corpus: widget.corpus,
                             onCopyToReply: widget.onCopyComment,
                           ),
                       ],
@@ -889,7 +967,7 @@ class _ResourcePanelState extends State<_ResourcePanel> {
           ),
           _SegmentAction(
             icon: Icons.reply_rounded,
-            label: 'Copy verse',
+            label: 'Copy',
             primary: true,
             onTap: widget.onCopyVerse,
           ),
@@ -959,16 +1037,20 @@ class _RelatedCategory extends StatelessWidget {
     required this.items,
     required this.lang,
     required this.onCopyToReply,
+    this.corpus = '',
   });
 
   final String category;
   final List<SeforimComment> items;
   final _ReaderLang lang;
+  final String corpus;
   final void Function(SeforimComment) onCopyToReply;
 
   @override
   Widget build(BuildContext context) {
-    // Group the works within this category, preserving order.
+    // Group the works within this category, then order them canonically:
+    // the corpus's classic top spots (Rashi / Bartenura…) first, the rest
+    // alphabetically.
     final order = <String>[];
     final byWork = <String, List<SeforimComment>>{};
     for (final c in items) {
@@ -979,6 +1061,7 @@ class _RelatedCategory extends StatelessWidget {
           })
           .add(c);
     }
+    _sortWorks(order, corpus);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1059,6 +1142,8 @@ class _CommentatorTileState extends State<_CommentatorTile> {
   @override
   Widget build(BuildContext context) {
     final hasHe = widget.heName.isNotEmpty;
+    final hasEnSource = widget.comments.any((c) => c.sourceHasEn);
+    final indexTitle = widget.comments.first.indexTitle;
     return Container(
       margin: const EdgeInsets.only(top: 6),
       decoration: BoxDecoration(
@@ -1076,6 +1161,8 @@ class _CommentatorTileState extends State<_CommentatorTile> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               child: Row(
                 children: [
+                  _LangBadge(hasEn: hasEnSource),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: hasHe
                         ? Text(
@@ -1112,6 +1199,7 @@ class _CommentatorTileState extends State<_CommentatorTile> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (indexTitle.isNotEmpty) _WorkAboutLine(indexTitle),
                   for (final c in widget.comments)
                     _LazyCommentText(
                       source: c,
@@ -1123,6 +1211,96 @@ class _CommentatorTileState extends State<_CommentatorTile> {
             ),
         ],
       ),
+    );
+  }
+}
+
+/// Language-availability badge on a work tile: "א" always (the source), plus
+/// "A" when Sefaria has an English text — our take on Sefaria's "EN" square.
+class _LangBadge extends StatelessWidget {
+  const _LangBadge({required this.hasEn});
+
+  final bool hasEn;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: SeforimPalette.paper,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: SeforimPalette.paperLine),
+      ),
+      child: Text(
+        hasEn ? 'א A' : 'א',
+        style: SeforimText.sans(
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
+          color: SeforimPalette.secondary,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+}
+
+/// The Sefaria-style about-the-author/work line shown when a work's tile is
+/// expanded: era/place plus a short description. Lazily fetched and cached in
+/// the repository; renders nothing when the index has no metadata.
+class _WorkAboutLine extends StatefulWidget {
+  const _WorkAboutLine(this.indexTitle);
+
+  final String indexTitle;
+
+  @override
+  State<_WorkAboutLine> createState() => _WorkAboutLineState();
+}
+
+class _WorkAboutLineState extends State<_WorkAboutLine> {
+  late final Future<SeforimWorkAbout> _future =
+      seforimRepository.fetchWorkAbout(widget.indexTitle);
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<SeforimWorkAbout>(
+      future: _future,
+      builder: (context, snap) {
+        final about = snap.data;
+        // Quietly absent while loading or when the index has nothing.
+        if (about == null || about.isEmpty) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (about.composedLine.isNotEmpty)
+                Text(
+                  about.composedLine,
+                  style: SeforimText.sans(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w500,
+                    color: SeforimPalette.tertiary,
+                  ),
+                ),
+              if (about.description.isNotEmpty) ...[
+                const SizedBox(height: 3),
+                Text(
+                  about.description,
+                  maxLines: 4,
+                  overflow: TextOverflow.ellipsis,
+                  style: SeforimText.sans(
+                    fontSize: 12.5,
+                    height: 1.4,
+                    color: SeforimPalette.secondary,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 2),
+              Divider(height: 10, color: SeforimPalette.paperLine),
+            ],
+          ),
+        );
+      },
     );
   }
 }

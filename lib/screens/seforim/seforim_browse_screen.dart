@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../data/repositories.dart';
+import '../../data/seforim_prefs.dart';
 import '../../models/seforim.dart';
 import '../../theme/seforim_palette.dart';
 import '../../widgets/async.dart';
@@ -48,6 +49,8 @@ class _SeforimBrowseScreenState extends State<SeforimBrowseScreen> {
                       ),
                     ),
                   ),
+                  const SeforimLangToggle(),
+                  const SizedBox(width: 4),
                   IconButton(
                     tooltip: 'Search seforim',
                     onPressed: () => context.push('/seforim/search'),
@@ -69,18 +72,26 @@ class _SeforimBrowseScreenState extends State<SeforimBrowseScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              AsyncView<List<SeforimNode>>(
-                future: _future,
-                onRetry: _refresh,
-                builder: (context, nodes) => Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    for (final node in nodes)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: seforimNodeRow(context, node: node),
-                      ),
-                  ],
+              ValueListenableBuilder<bool>(
+                valueListenable: seforimHebrewMode,
+                builder: (context, hebrew, _) =>
+                    AsyncView<List<SeforimNode>>(
+                  future: _future,
+                  onRetry: _refresh,
+                  builder: (context, nodes) => Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (final node in nodes)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: seforimNodeRow(
+                            context,
+                            node: node,
+                            hebrew: hebrew,
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: 8),

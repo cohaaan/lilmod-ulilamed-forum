@@ -218,6 +218,8 @@ class SeforimRepository {
         heRef: (l['sourceHeRef'] ?? '') as String,
         he: '',
         en: '',
+        indexTitle: (l['index_title'] as String?) ?? '',
+        sourceHasEn: l['sourceHasEn'] == true,
       ));
     }
     _putCapped(_relatedCache, verseRef, out);
@@ -256,6 +258,46 @@ class SeforimRepository {
     );
     _putCapped(_sourceTextCache, ref, result);
     return result;
+  }
+
+  // ------------------------------------------------------------------- about
+  /// About-the-work metadata, cached per index title. Sefaria shows an author
+  /// blurb and a "Composed" line for each work; `/api/v2/raw/index/{title}`
+  /// carries both (`enDesc`, `compDate`, `compPlace`).
+  final Map<String, SeforimWorkAbout> _aboutCache = {};
+
+  Future<SeforimWorkAbout> fetchWorkAbout(String indexTitle) async {
+    final cached = _aboutCache[indexTitle];
+    if (cached != null) return cached;
+
+    final slug = indexTitle.replaceAll(' ', '_');
+    final data =
+        await _getJson(_uri('/api/v2/raw/index/${Uri.encodeComponent(slug)}'))
+            as Map<String, dynamic>;
+
+    final desc = _clean((data['enDesc'] ?? data['enShortDesc'] ?? '') as String);
+    final place = (data['compPlace'] ?? '') as String;
+    final dates = (data['compDate'] as List? ?? const [])
+        .whereType<num>()
+        .map((n) => n.toInt())
+        .toList();
+    String era = '';
+    if (dates.length >= 2 && dates[0] != dates[1]) {
+      era = 'c.${dates[0]} – c.${dates[1]}';
+    } else if (dates.isNotEmpty) {
+      era = 'c.${dates[0]}';
+    }
+    final composed = [
+      if (place.isNotEmpty) place,
+      if (era.isNotEmpty) era,
+    ].join(', ');
+
+    final about = SeforimWorkAbout(
+      description: desc,
+      composedLine: composed.isEmpty ? '' : 'Composed: $composed',
+    );
+    _putCapped(_aboutCache, indexTitle, about);
+    return about;
   }
 
   /// Flatten a links-API `text`/`he` field (String, or possibly-nested List)
