@@ -1,16 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../data/repositories.dart';
 import '../../models/seforim.dart';
-import '../../theme/app_colors.dart';
+import '../../theme/seforim_palette.dart';
 import '../../widgets/async.dart';
 import '../../widgets/seforim_rows.dart';
-import '../../theme/app_text.dart';
 
 /// The Seforim tab root: the top level of the library tree, Sefaria-style —
-/// a colour-coded, serif list of corpora with short descriptions.
+/// a colour-coded, serif list of corpora with short sans descriptions on a
+/// white page.
 class SeforimBrowseScreen extends StatefulWidget {
   const SeforimBrowseScreen({super.key});
 
@@ -29,7 +28,7 @@ class _SeforimBrowseScreenState extends State<SeforimBrowseScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.surface,
+      backgroundColor: SeforimPalette.paper,
       body: SafeArea(
         bottom: false,
         child: RefreshIndicator(
@@ -41,49 +40,56 @@ class _SeforimBrowseScreenState extends State<SeforimBrowseScreen> {
                 children: [
                   Expanded(
                     child: Text(
-                      'Seforim Library',
-                      style: GoogleFonts.ebGaramond(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.ink,
+                      'Browse the Library',
+                      style: SeforimText.sans(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w500,
+                        color: SeforimPalette.secondary,
                       ),
                     ),
                   ),
                   IconButton(
                     tooltip: 'Search seforim',
                     onPressed: () => context.push('/seforim/search'),
-                    icon: Icon(Icons.search_rounded,
-                        color: AppColors.ink),
+                    icon: Icon(
+                      Icons.search_rounded,
+                      color: SeforimPalette.secondary,
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               Text(
-                'Browse the library and copy sources straight into your reply.',
-                style: AppText.inter(
-                  fontSize: 13.5,
-                  color: AppColors.muted,
-                  height: 1.45,
+                'Read the classic texts and copy sources straight into your '
+                'reply.',
+                style: SeforimText.sans(
+                  fontSize: 14,
+                  color: SeforimPalette.secondary,
+                  height: 1.3,
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 16),
               AsyncView<List<SeforimNode>>(
                 future: _future,
                 onRetry: _refresh,
                 builder: (context, nodes) => Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    for (final node in nodes) seforimNodeRow(context, node: node),
+                    for (final node in nodes)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: seforimNodeRow(context, node: node),
+                      ),
                   ],
                 ),
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 8),
               Text(
                 'Texts via Sefaria’s open API. Sources are attributed to their '
                 'publishers; most are public domain or Creative Commons.',
-                style: AppText.inter(
-                  fontSize: 11.5,
-                  color: AppColors.muted,
+                style: SeforimText.sans(
+                  fontSize: 12,
+                  color: SeforimPalette.tertiary,
                   height: 1.4,
                 ),
               ),

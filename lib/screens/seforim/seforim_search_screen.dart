@@ -5,11 +5,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../data/repositories.dart';
 import '../../models/seforim.dart';
-import '../../theme/app_colors.dart';
-import '../../widgets/soft_card.dart';
-import '../../theme/app_text.dart';
+import '../../theme/seforim_palette.dart';
 
-/// Full-text search across the library, debounced. Tapping a hit opens the
+/// Full-text search across the library, debounced. Sefaria-style results —
+/// serif ref over a grey snippet, hairline separated. Tapping a hit opens the
 /// reader at that reference.
 class SeforimSearchScreen extends StatefulWidget {
   const SeforimSearchScreen({super.key});
@@ -46,36 +45,62 @@ class _SeforimSearchScreenState extends State<SeforimSearchScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: SeforimPalette.paper,
       appBar: AppBar(
+        backgroundColor: SeforimPalette.paper,
+        surfaceTintColor: Colors.transparent,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () =>
               context.canPop() ? context.pop() : context.go('/seforim'),
         ),
         title: Text(
-          'Search seforim',
-          style: AppText.inter(fontSize: 16, fontWeight: FontWeight.w700),
+          'Search',
+          style: SeforimText.sans(
+            fontSize: 17,
+            fontWeight: FontWeight.w500,
+            color: SeforimPalette.secondary,
+          ),
         ),
       ),
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
             child: TextField(
               controller: _controller,
               autofocus: true,
               textInputAction: TextInputAction.search,
               onChanged: _onChanged,
+              style: SeforimText.sans(
+                fontSize: 15,
+                color: SeforimPalette.black,
+              ),
               decoration: InputDecoration(
                 hintText: 'Search texts, e.g. “tzedakah”…',
-                prefixIcon: Icon(Icons.search_rounded),
+                hintStyle: SeforimText.sans(
+                  fontSize: 15,
+                  color: SeforimPalette.tertiary,
+                ),
+                prefixIcon: Icon(
+                  Icons.search_rounded,
+                  color: SeforimPalette.secondary,
+                ),
                 filled: true,
-                fillColor: AppColors.surfaceMuted,
+                fillColor: SeforimPalette.faint,
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide.none,
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: SeforimPalette.paperLine),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: SeforimPalette.paperLine),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: SeforimPalette.navy),
                 ),
               ),
             ),
@@ -113,48 +138,57 @@ class _SeforimSearchScreenState extends State<SeforimSearchScreen> {
             text: 'No results for “$_query”.',
           );
         }
-        return ListView.builder(
+        return ListView.separated(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           itemCount: results.length,
+          separatorBuilder: (_, __) =>
+              Divider(height: 1, color: SeforimPalette.paperLine),
           itemBuilder: (context, i) {
             final r = results[i];
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: SoftCard(
-                onTap: () => context
-                    .push('/seforim/read/${Uri.encodeComponent(r.ref)}'),
+            return InkWell(
+              onTap: () =>
+                  context.push('/seforim/read/${Uri.encodeComponent(r.ref)}'),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 14),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      r.ref,
-                      style: AppText.inter(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.indigo,
-                      ),
-                    ),
-                    if (r.heRef.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        r.heRef,
-                        textDirection: TextDirection.rtl,
-                        style: AppText.inter(
-                          fontSize: 12.5,
-                          color: AppColors.muted,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            r.ref,
+                            style: SeforimText.serif(
+                              fontSize: 18,
+                              color: SeforimPalette.black,
+                            ),
+                          ),
                         ),
-                      ),
-                    ],
+                        if (r.heRef.isNotEmpty) ...[
+                          const SizedBox(width: 10),
+                          Text(
+                            r.heRef,
+                            textDirection: TextDirection.rtl,
+                            style: SeforimText.hebrew(
+                              fontSize: 16,
+                              color: SeforimPalette.tertiary,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                     if (r.snippet.isNotEmpty) ...[
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 5),
                       Text(
                         r.snippet,
                         maxLines: 3,
                         overflow: TextOverflow.ellipsis,
-                        style: AppText.inter(
-                          fontSize: 13.5,
+                        style: SeforimText.serif(
+                          fontSize: 15,
                           height: 1.5,
-                          color: AppColors.body,
+                          color: SeforimPalette.secondary,
                         ),
                       ),
                     ],
@@ -181,14 +215,17 @@ class _Hint extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 44, color: AppColors.muted),
+          Icon(icon, size: 44, color: SeforimPalette.tertiary),
           const SizedBox(height: 12),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 40),
             child: Text(
               text,
               textAlign: TextAlign.center,
-              style: AppText.inter(fontSize: 14, color: AppColors.muted),
+              style: SeforimText.sans(
+                fontSize: 14,
+                color: SeforimPalette.secondary,
+              ),
             ),
           ),
         ],

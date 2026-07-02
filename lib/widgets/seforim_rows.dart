@@ -1,25 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../models/seforim.dart';
-import '../theme/app_colors.dart';
 import '../theme/seforim_palette.dart';
-import '../theme/app_text.dart';
 
-/// A Sefaria-style library row: a thin category-colour rule on top, the
-/// work/category name in a serif face with its Hebrew name alongside, and a
-/// short description below. Categories drill into a sub-list; books open their
+/// A Sefaria-style library row: a 4px category-colour rule on top (top level
+/// only — sub-levels separate with a hairline, like Sefaria), the name in
+/// Cardo with its Hebrew name in Taamey Frank alongside, and a short sans
+/// description below. Categories drill into a sub-list; books open their
 /// table of contents.
 Widget seforimNodeRow(
   BuildContext context, {
   required SeforimNode node,
+  bool showColorBar = true,
 }) {
   final color = SeforimPalette.forCategory(node.colorKey);
   return Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      Container(height: 3, color: color),
+      if (showColorBar)
+        Container(height: 4, color: color)
+      else
+        Divider(height: 1, thickness: 1, color: SeforimPalette.paperLine),
       Material(
         color: Colors.transparent,
         child: InkWell(
@@ -43,11 +45,11 @@ Widget seforimNodeRow(
                     Expanded(
                       child: Text(
                         node.label,
-                        style: GoogleFonts.ebGaramond(
+                        style: SeforimText.serif(
                           fontSize: 24,
-                          fontWeight: FontWeight.w500,
-                          height: 1.1,
-                          color: AppColors.ink,
+                          fontWeight: FontWeight.w400,
+                          height: 1.3,
+                          color: SeforimPalette.black,
                         ),
                       ),
                     ),
@@ -56,23 +58,22 @@ Widget seforimNodeRow(
                       Text(
                         node.heLabel,
                         textDirection: TextDirection.rtl,
-                        style: GoogleFonts.frankRuhlLibre(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.body,
+                        style: SeforimText.hebrew(
+                          fontSize: 21,
+                          color: SeforimPalette.secondary,
                         ),
                       ),
                     ],
                   ],
                 ),
                 if (node.description.isNotEmpty) ...[
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 5),
                   Text(
                     node.description,
-                    style: AppText.inter(
-                      fontSize: 13.5,
-                      height: 1.45,
-                      color: AppColors.muted,
+                    style: SeforimText.sans(
+                      fontSize: 14,
+                      height: 1.3,
+                      color: SeforimPalette.secondary,
                     ),
                   ),
                 ],
@@ -111,10 +112,9 @@ Widget seforimSectionRow({
                         label,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.ebGaramond(
+                        style: SeforimText.serif(
                           fontSize: 19,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.ink,
+                          color: SeforimPalette.black,
                         ),
                       ),
                       if (heLabel.isNotEmpty) ...[
@@ -124,9 +124,9 @@ Widget seforimSectionRow({
                           textDirection: TextDirection.rtl,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.frankRuhlLibre(
-                            fontSize: 15,
-                            color: AppColors.muted,
+                          style: SeforimText.hebrew(
+                            fontSize: 16,
+                            color: SeforimPalette.secondary,
                           ),
                         ),
                       ],
@@ -134,15 +134,18 @@ Widget seforimSectionRow({
                   ),
                 ),
                 const SizedBox(width: 6),
-                Icon(Icons.chevron_right_rounded,
-                    color: AppColors.muted, size: 20),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: SeforimPalette.tertiary,
+                  size: 20,
+                ),
               ],
             ),
           ),
         ),
       ),
       if (showDivider)
-        Divider(height: 1, color: AppColors.line),
+        Divider(height: 1, color: SeforimPalette.paperLine),
     ],
   );
 }

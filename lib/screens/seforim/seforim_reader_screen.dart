@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../config/seforim_config.dart';
@@ -11,7 +10,6 @@ import '../../models/seforim.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/seforim_palette.dart';
 import '../../widgets/async.dart';
-import '../../theme/app_text.dart';
 
 enum _ReaderLang { both, hebrew, english }
 
@@ -305,6 +303,7 @@ class _SeforimReaderScreenState extends State<SeforimReaderScreen> {
       appBar: AppBar(
         backgroundColor: SeforimPalette.paper,
         surfaceTintColor: Colors.transparent,
+        centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () =>
@@ -314,11 +313,7 @@ class _SeforimReaderScreenState extends State<SeforimReaderScreen> {
           _ref,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: GoogleFonts.ebGaramond(
-            fontSize: 19,
-            fontWeight: FontWeight.w600,
-            color: AppColors.ink,
-          ),
+          style: SeforimText.serif(fontSize: 18, color: SeforimPalette.black),
         ),
         actions: [
           PopupMenuButton<_ReaderLang>(
@@ -354,7 +349,10 @@ class _SeforimReaderScreenState extends State<SeforimReaderScreen> {
                 return Center(
                   child: Text(
                     'No text available for this section.',
-                    style: AppText.inter(fontSize: 14, color: AppColors.muted),
+                    style: SeforimText.sans(
+                      fontSize: 14,
+                      color: SeforimPalette.secondary,
+                    ),
                   ),
                 );
               }
@@ -377,10 +375,10 @@ class _SeforimReaderScreenState extends State<SeforimReaderScreen> {
                       'No $lang text available for this section.\n'
                       'Try switching language from the menu above.',
                       textAlign: TextAlign.center,
-                      style: AppText.inter(
+                      style: SeforimText.sans(
                         fontSize: 14,
                         height: 1.5,
-                        color: AppColors.muted,
+                        color: SeforimPalette.secondary,
                       ),
                     ),
                   ),
@@ -422,7 +420,7 @@ class _SeforimReaderScreenState extends State<SeforimReaderScreen> {
               Container(
                 width: 360,
                 decoration: BoxDecoration(
-                  color: AppColors.surface,
+                  color: SeforimPalette.paper,
                   border: Border(
                     left: BorderSide(color: SeforimPalette.paperLine),
                   ),
@@ -452,15 +450,19 @@ class _SeforimReaderScreenState extends State<SeforimReaderScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.menu_book_rounded, size: 34, color: AppColors.muted),
+          Icon(
+            Icons.menu_book_rounded,
+            size: 34,
+            color: SeforimPalette.secondary,
+          ),
           const SizedBox(height: 12),
           Text(
             'Tap a verse to see its\ncommentaries and sources',
             textAlign: TextAlign.center,
-            style: AppText.inter(
+            style: SeforimText.sans(
               fontSize: 13,
               height: 1.5,
-              color: AppColors.muted,
+              color: SeforimPalette.secondary,
             ),
           ),
         ],
@@ -468,45 +470,70 @@ class _SeforimReaderScreenState extends State<SeforimReaderScreen> {
     ),
   );
 
-  /// One loaded section: its Hebrew heading followed by its verses.
+  /// The section's own number ("2", "10b") pulled off the end of its ref —
+  /// Sefaria heads each section with just this numeral.
+  static String _sectionNumber(SeforimPassage p) {
+    final m = RegExp(r'(\d+[ab]?)$').firstMatch(p.ref.trim());
+    return m?.group(1) ?? '';
+  }
+
+  /// One loaded section: a centered section-number heading (Sefaria-style)
+  /// over a short rule, followed by its verses. The column is capped at a
+  /// comfortable reading measure on wide screens, like Sefaria's page.
   Widget _sectionSlab(SeforimPassage p) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (p.heRef.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 18, bottom: 10),
-              child: Column(
-                children: [
-                  Text(
-                    p.heRef,
-                    textDirection: TextDirection.rtl,
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.frankRuhlLibre(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.ink,
+    final number = _sectionNumber(p);
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 640),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 20, bottom: 12),
+                child: Column(
+                  children: [
+                    if (number.isNotEmpty)
+                      Text(
+                        number,
+                        textAlign: TextAlign.center,
+                        style: SeforimText.serif(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w300,
+                          letterSpacing: 1,
+                          color: SeforimPalette.black,
+                        ),
+                      )
+                    else if (p.heRef.isNotEmpty)
+                      Text(
+                        p.heRef,
+                        textDirection: TextDirection.rtl,
+                        textAlign: TextAlign.center,
+                        style: SeforimText.hebrew(
+                          fontSize: 24,
+                          color: SeforimPalette.black,
+                        ),
+                      ),
+                    const SizedBox(height: 10),
+                    Container(
+                      width: 44,
+                      height: 3,
+                      color: SeforimPalette.paperLine,
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                  Container(
-                    width: 40,
-                    height: 2,
-                    color: SeforimPalette.paperLine,
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          for (final seg in p.segments)
-            _SegmentView(
-              segment: seg,
-              lang: _lang,
-              selected: _selectedRef == '${p.ref}:${seg.number}',
-              onTap: () => _openVerse('${p.ref}:${seg.number}'),
-            ),
-        ],
+              for (final seg in p.segments)
+                _SegmentView(
+                  segment: seg,
+                  lang: _lang,
+                  selected: _selectedRef == '${p.ref}:${seg.number}',
+                  onTap: () => _openVerse('${p.ref}:${seg.number}'),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -549,10 +576,10 @@ class _SeforimReaderScreenState extends State<SeforimReaderScreen> {
               child: Text(
                 last.book.isNotEmpty ? 'End of ${last.book}' : 'End of text',
                 textAlign: TextAlign.center,
-                style: AppText.inter(
+                style: SeforimText.sans(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.muted,
+                  color: SeforimPalette.secondary,
                   letterSpacing: 0.3,
                 ),
               ),
@@ -582,14 +609,17 @@ class _SeforimReaderScreenState extends State<SeforimReaderScreen> {
         Text(
           message,
           textAlign: TextAlign.center,
-          style: AppText.inter(fontSize: 12.5, color: AppColors.muted),
+          style: SeforimText.sans(
+            fontSize: 12.5,
+            color: SeforimPalette.secondary,
+          ),
         ),
         const SizedBox(height: 4),
         TextButton.icon(
           onPressed: onRetry,
           icon: const Icon(Icons.refresh_rounded, size: 16),
           label: const Text('Retry'),
-          style: TextButton.styleFrom(foregroundColor: AppColors.indigo),
+          style: TextButton.styleFrom(foregroundColor: SeforimPalette.navy),
         ),
       ],
     ),
@@ -619,14 +649,11 @@ class _SegmentView extends StatelessWidget {
     if (!showHe && !showEn) return const SizedBox.shrink();
 
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 2),
+      margin: const EdgeInsets.symmetric(vertical: 1),
       decoration: selected
           ? BoxDecoration(
               color: SeforimPalette.paperSelected,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: AppColors.indigo.withValues(alpha: 0.22),
-              ),
+              borderRadius: BorderRadius.circular(4),
             )
           : null,
       child: Column(
@@ -634,23 +661,25 @@ class _SegmentView extends StatelessWidget {
         children: [
           InkWell(
             onTap: onTap,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(4),
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   SizedBox(
-                    width: 22,
+                    width: 20,
                     child: Padding(
-                      padding: const EdgeInsets.only(top: 7),
+                      padding: const EdgeInsets.only(top: 8),
                       child: Text(
                         segment.number,
                         textAlign: TextAlign.center,
-                        style: GoogleFonts.ebGaramond(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: selected ? AppColors.indigo : AppColors.muted,
+                        style: SeforimText.sans(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w300,
+                          color: selected
+                              ? SeforimPalette.navy
+                              : SeforimPalette.tertiary,
                         ),
                       ),
                     ),
@@ -664,20 +693,20 @@ class _SegmentView extends StatelessWidget {
                           Text(
                             segment.he,
                             textDirection: TextDirection.rtl,
-                            style: GoogleFonts.frankRuhlLibre(
-                              fontSize: 23,
-                              height: 2.0,
-                              color: AppColors.ink,
+                            style: SeforimText.hebrew(
+                              fontSize: 26,
+                              height: 1.6,
+                              color: SeforimPalette.black,
                             ),
                           ),
-                        if (showHe && showEn) const SizedBox(height: 10),
+                        if (showHe && showEn) const SizedBox(height: 8),
                         if (showEn)
                           Text(
                             segment.en,
-                            style: GoogleFonts.ebGaramond(
-                              fontSize: 17,
-                              height: 1.75,
-                              color: AppColors.body,
+                            style: SeforimText.serif(
+                              fontSize: 21,
+                              height: 1.6,
+                              color: SeforimPalette.secondary,
                             ),
                           ),
                       ],
@@ -839,21 +868,20 @@ class _ResourcePanelState extends State<_ResourcePanel> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Connections',
-                  style: AppText.inter(
+                  'RESOURCES',
+                  style: SeforimText.sans(
                     fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.muted,
-                    letterSpacing: 0.5,
+                    fontWeight: FontWeight.w500,
+                    color: SeforimPalette.tertiary,
+                    letterSpacing: 1.5,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   widget.verseRef,
-                  style: GoogleFonts.ebGaramond(
+                  style: SeforimText.serif(
                     fontSize: 17,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.ink,
+                    color: SeforimPalette.black,
                   ),
                 ),
               ],
@@ -869,7 +897,7 @@ class _ResourcePanelState extends State<_ResourcePanel> {
             IconButton(
               tooltip: 'Close',
               icon: const Icon(Icons.close_rounded, size: 20),
-              color: AppColors.muted,
+              color: SeforimPalette.secondary,
               onPressed: widget.onClose,
             ),
         ],
@@ -893,15 +921,15 @@ class _ResourcePanelState extends State<_ResourcePanel> {
             label: Text(cat == _allFilter ? 'All' : cat),
             selected: selected,
             showCheckmark: false,
-            labelStyle: AppText.inter(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w600,
-              color: selected ? Colors.white : AppColors.body,
+            labelStyle: SeforimText.sans(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: selected ? Colors.white : SeforimPalette.secondary,
             ),
-            backgroundColor: AppColors.surface,
-            selectedColor: AppColors.indigo,
+            backgroundColor: SeforimPalette.paper,
+            selectedColor: SeforimPalette.navy,
             side: BorderSide(
-              color: selected ? AppColors.indigo : SeforimPalette.paperLine,
+              color: selected ? SeforimPalette.navy : SeforimPalette.paperLine,
             ),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(999),
@@ -918,7 +946,7 @@ class _ResourcePanelState extends State<_ResourcePanel> {
     child: Text(
       text,
       textAlign: TextAlign.center,
-      style: AppText.inter(fontSize: 13, color: AppColors.muted),
+      style: SeforimText.sans(fontSize: 13, color: SeforimPalette.secondary),
     ),
   );
 }
@@ -955,26 +983,37 @@ class _RelatedCategory extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(4, 12, 4, 2),
+          padding: const EdgeInsets.fromLTRB(4, 14, 4, 4),
           child: Row(
             children: [
+              Icon(
+                Icons.menu_book_rounded,
+                size: 17,
+                color: SeforimPalette.forCategory(category),
+              ),
+              const SizedBox(width: 8),
               Text(
-                _relatedHeLabels[category] ?? category,
-                textDirection: TextDirection.rtl,
-                style: GoogleFonts.frankRuhlLibre(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.muted,
+                category,
+                style: SeforimText.serif(
+                  fontSize: 17,
+                  color: SeforimPalette.black,
                 ),
               ),
               const SizedBox(width: 6),
               Text(
-                '${category.toUpperCase()} · ${order.length}',
-                style: AppText.inter(
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.muted,
-                  letterSpacing: 0.4,
+                '(${order.length})',
+                style: SeforimText.sans(
+                  fontSize: 13,
+                  color: SeforimPalette.tertiary,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                _relatedHeLabels[category] ?? '',
+                textDirection: TextDirection.rtl,
+                style: SeforimText.hebrew(
+                  fontSize: 15,
+                  color: SeforimPalette.tertiary,
                 ),
               ),
             ],
@@ -1023,8 +1062,8 @@ class _CommentatorTileState extends State<_CommentatorTile> {
     return Container(
       margin: const EdgeInsets.only(top: 6),
       decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(10),
+        color: SeforimPalette.faint,
+        borderRadius: BorderRadius.circular(6),
         border: Border.all(color: SeforimPalette.paperLine),
       ),
       child: Column(
@@ -1032,30 +1071,36 @@ class _CommentatorTileState extends State<_CommentatorTile> {
         children: [
           InkWell(
             onTap: () => setState(() => _open = !_open),
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(6),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               child: Row(
                 children: [
                   Expanded(
-                    child: Text(
-                      hasHe ? widget.heName : widget.name,
-                      textDirection: hasHe
-                          ? TextDirection.rtl
-                          : TextDirection.ltr,
-                      style: GoogleFonts.frankRuhlLibre(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.ink,
-                      ),
-                    ),
+                    child: hasHe
+                        ? Text(
+                            widget.heName,
+                            textDirection: TextDirection.rtl,
+                            style: SeforimText.hebrew(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w700,
+                              color: SeforimPalette.black,
+                            ),
+                          )
+                        : Text(
+                            widget.name,
+                            style: SeforimText.serif(
+                              fontSize: 16,
+                              color: SeforimPalette.black,
+                            ),
+                          ),
                   ),
                   Icon(
                     _open
                         ? Icons.expand_less_rounded
                         : Icons.expand_more_rounded,
                     size: 20,
-                    color: AppColors.muted,
+                    color: SeforimPalette.tertiary,
                   ),
                 ],
               ),
@@ -1123,7 +1168,10 @@ class _LazyCommentTextState extends State<_LazyCommentText> {
             padding: const EdgeInsets.symmetric(vertical: 6),
             child: Text(
               'Could not load this source.',
-              style: AppText.inter(fontSize: 12.5, color: AppColors.muted),
+              style: SeforimText.sans(
+                fontSize: 12.5,
+                color: SeforimPalette.secondary,
+              ),
             ),
           );
         }
@@ -1139,20 +1187,20 @@ class _LazyCommentTextState extends State<_LazyCommentText> {
               Text(
                 he,
                 textDirection: TextDirection.rtl,
-                style: GoogleFonts.frankRuhlLibre(
-                  fontSize: 17,
-                  height: 1.7,
-                  color: AppColors.ink,
+                style: SeforimText.hebrew(
+                  fontSize: 19,
+                  height: 1.6,
+                  color: SeforimPalette.black,
                 ),
               ),
             if (showHe && showEn) const SizedBox(height: 6),
             if (showEn)
               Text(
                 en,
-                style: AppText.inter(
-                  fontSize: 13.5,
-                  height: 1.55,
-                  color: AppColors.body,
+                style: SeforimText.serif(
+                  fontSize: 15,
+                  height: 1.5,
+                  color: SeforimPalette.secondary,
                 ),
               ),
             const SizedBox(height: 8),
@@ -1198,10 +1246,10 @@ class _SegmentAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = primary ? AppColors.indigo : AppColors.muted;
+    final color = primary ? SeforimPalette.navy : SeforimPalette.secondary;
     return Material(
       color: primary
-          ? AppColors.indigo.withValues(alpha: 0.10)
+          ? SeforimPalette.navy.withValues(alpha: 0.08)
           : Colors.transparent,
       borderRadius: BorderRadius.circular(999),
       child: InkWell(
@@ -1216,7 +1264,7 @@ class _SegmentAction extends StatelessWidget {
               const SizedBox(width: 5),
               Text(
                 label,
-                style: AppText.inter(
+                style: SeforimText.sans(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                   color: color,
@@ -1283,10 +1331,10 @@ class _Attribution extends StatelessWidget {
         children: [
           Text(
             'SOURCE',
-            style: AppText.inter(
+            style: SeforimText.sans(
               fontSize: 10.5,
               fontWeight: FontWeight.w700,
-              color: AppColors.muted,
+              color: SeforimPalette.secondary,
               letterSpacing: 0.6,
             ),
           ),
@@ -1298,7 +1346,10 @@ class _Attribution extends StatelessWidget {
                   if (a.versionTitle.isNotEmpty) a.versionTitle,
                   if (a.license.isNotEmpty) a.license,
                 ].join(' · '),
-                style: AppText.inter(fontSize: 11.5, color: AppColors.muted),
+                style: SeforimText.sans(
+                  fontSize: 11.5,
+                  color: SeforimPalette.secondary,
+                ),
               ),
             if (a.source.isNotEmpty)
               _LinkText(
@@ -1320,17 +1371,17 @@ class _Attribution extends StatelessWidget {
                   children: [
                     Text(
                       'View this passage on Sefaria',
-                      style: AppText.inter(
+                      style: SeforimText.sans(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.indigo,
+                        color: SeforimPalette.navy,
                       ),
                     ),
                     const SizedBox(width: 4),
                     Icon(
                       Icons.open_in_new_rounded,
                       size: 13,
-                      color: AppColors.indigo,
+                      color: SeforimPalette.navy,
                     ),
                   ],
                 ),
@@ -1355,9 +1406,9 @@ class _LinkText extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = Text(
       label,
-      style: AppText.inter(
+      style: SeforimText.sans(
         fontSize: 11.5,
-        color: onTap != null ? AppColors.indigo : AppColors.muted,
+        color: onTap != null ? SeforimPalette.navy : SeforimPalette.secondary,
         decoration: onTap != null ? TextDecoration.underline : null,
       ),
     );

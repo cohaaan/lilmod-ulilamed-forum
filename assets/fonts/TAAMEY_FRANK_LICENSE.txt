@@ -1,0 +1,14 @@
+Taamey Frank CLM (TaameyFrankCLM-Medium.ttf, TaameyFrankCLM-Bold.ttf)
+
+A digitization of the classic Frank-Rühl Hebrew typeface with full nikud and
+te'amim support, by the Culmus project (Maxim Iorsh et al.).
+https://culmus.sourceforge.io/
+
+License: GNU General Public License v2 with the font-embedding exception —
+"As a special exception, if you create a document which uses this font, and
+embed this font or unaltered portions of this font into the document, this
+font does not by itself cause the resulting document to be covered by the
+GNU General Public License."
+
+The font files are bundled unmodified. They are not the property of, nor
+associated with, this application's authors.

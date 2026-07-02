@@ -1,21 +1,18 @@
-# Seforim reader redesign — screenshots
+# Seforim — Sefaria-fidelity screenshots
 
-Visual reference for the "feels like Sefaria" reader redesign
-(`docs/seforim/READER_SEFARIA_FEEL.md`, Phases 1–3).
-
-These were rendered from a **throwaway preview harness with mock Genesis 1 data**,
-not the live app — Supabase (auth) and the Sefaria API were unreachable in the
-build environment. The harness renders the real `SeforimReaderScreen` widget
-tree, so layout, interaction, and typography (Frank Ruhl Libre / EB Garamond on
-the paper surface) are faithful; only the data is stubbed.
+Rendered from the **real widgets against the live Sefaria API** (no mock data)
+via `lib/preview_seforim_main.dart` on `flutter run -d web-server`, mobile
+viewport 390×844. Typography is the Sefaria-fidelity set: Cardo (English serif),
+Taamey Frank CLM (Hebrew), Roboto (UI sans) — see
+`docs/seforim/SEFARIA_DESIGN_TOKENS.md`.
 
 | File | Shows |
 |---|---|
-| `4-narrow-reading.png` | Paper reading view, per-verse He→En interleave, section heading (Phase 1 + 2) |
-| `5-narrow-sheet.png` | Mobile: tap a verse → connections bottom sheet with filter chips (Phase 3) |
-| `2-wide-panel.png` | Wide: selected verse highlighted + docked connections rail (Phase 1 + 3) |
-| `3-wide-panel-open.png` | Wide: a commentator expanded with He+En text and "Copy to reply" (Phase 3) |
-| `1-wide-reading.png` | Wide reading view with the empty connections rail placeholder |
+| `1-browse.png` | Library root — colour-coded corpora, Cardo titles, Hebrew names, sans descriptions |
+| `2-category.png` | Mishnah category — serif heading over its colour rule, hairline sub-rows |
+| `3-toc.png` | Mishnah Peah TOC — Cardo title, navy Start Reading, chapter-box grid |
+| `4-reader.png` | Reader (Mishnah Peah 2) — centered section numeral, Taamey Frank He + grey Cardo En |
+| `5-resources.png` | Verse selected (pale-blue wash) → RESOURCES sheet, filter chips, Commentary (13) |
 
-A real `flutter run -d chrome` pass against live Sefaria (Genesis 1→2 continuous
-scroll, a Talmud daf, an English-only text) is still worth doing before merge.
+These supersede the earlier mock-data preview-harness renders from the initial
+Phase 1–3 pass (which used Frank Ruhl Libre / EB Garamond on a cream surface).

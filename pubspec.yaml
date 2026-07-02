@@ -34,3 +34,11 @@ flutter:
     - family: NotoSansHebrew
       fonts:
         - asset: assets/fonts/NotoSansHebrew-VariableFont.ttf
+    # Taamey Frank CLM (Culmus project, GPL + font-embedding exception) — the
+    # classic vocalised-Hebrew face for the Seforim reader. License note in
+    # assets/fonts/TAAMEY_FRANK_LICENSE.txt.
+    - family: TaameyFrank
+      fonts:
+        - asset: assets/fonts/TaameyFrankCLM-Medium.ttf
+        - asset: assets/fonts/TaameyFrankCLM-Bold.ttf
+          weight: 700
